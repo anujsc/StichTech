@@ -1,149 +1,146 @@
-// ─── User ────────────────────────────────────────────────────────────────────
+// ─── Primitive unions ─────────────────────────────────────────────────────────
 
-export interface IUser {
-  _id: string;
-  name: string;
-  email: string;
-  role: 'student' | 'admin';
-  avatar?: string;
-  phone?: string;
-  city?: string;
-  isEmailVerified: boolean;
-  isGoogleUser: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+export type ThumbnailColour =
+  | 'rose'
+  | 'amber'
+  | 'terracotta'
+  | 'marigold'
+  | 'burgundy'
+  | 'saffron';
 
-// ─── Course ───────────────────────────────────────────────────────────────────
+export type CourseLevel = 'beginner' | 'intermediate' | 'advanced';
+
+export type CourseStatus = 'draft' | 'published';
+
+export type CourseLanguage = 'Hindi' | 'English' | 'Mixed';
+
+export type UserRole = 'student' | 'admin';
+
+export type AuthProvider = 'google' | 'email';
+
+// ─── Video & Course ───────────────────────────────────────────────────────────
 
 export interface IVideo {
-  _id: string;
+  id: string;
   title: string;
-  description?: string;
+  description: string;
   cloudinaryPublicId: string;
-  cloudinaryUrl: string;
-  thumbnailUrl?: string;
   durationSeconds: number;
-  order: number;
+  sortOrder: number;
   isFreePreview: boolean;
 }
 
 export interface IModule {
-  _id: string;
+  id: string;
   title: string;
-  description?: string;
-  order: number;
+  sortOrder: number;
   videos: IVideo[];
 }
 
 export interface ICourse {
-  _id: string;
+  id: string;
   title: string;
-  slug: string;
   description: string;
-  shortDescription: string;
-  thumbnailUrl: string;
-  previewVideoUrl?: string;
+  thumbnailColour: ThumbnailColour;
   price: number;
   discountedPrice?: number;
-  language: string;
-  level: 'beginner' | 'intermediate' | 'advanced';
-  category: string;
-  tags: string[];
-  modules: IModule[];
-  totalDurationSeconds: number;
+  language: CourseLanguage;
+  level: CourseLevel;
+  status: CourseStatus;
+  instructorName: string;
+  instructorBio?: string;
+  totalModules: number;
   totalVideos: number;
-  enrollmentCount: number;
-  rating: number;
-  reviewCount: number;
-  isPublished: boolean;
-  instructor: Pick<IUser, '_id' | 'name' | 'avatar'>;
-  createdAt: string;
-  updatedAt: string;
+  totalDurationSeconds: number;
+  modules: IModule[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+export interface IUser {
+  id: string;
+  name: string;
+  email: string;
+  profilePicUrl?: string;
+  role: UserRole;
+  authProvider: AuthProvider;
+  isEmailVerified: boolean;
+  createdAt: Date;
 }
 
 // ─── Enrollment ───────────────────────────────────────────────────────────────
 
-export type EnrollmentStatus = 'active' | 'expired' | 'refunded';
-
 export interface IEnrollment {
-  _id: string;
-  user: string | IUser;
-  course: string | ICourse;
-  status: EnrollmentStatus;
-  razorpayOrderId: string;
-  razorpayPaymentId: string;
+  id: string;
+  userId: string;
+  courseId: string;
+  courseName: string;
+  courseThumbnailColour: ThumbnailColour;
   amountPaid: number;
-  enrolledAt: string;
-  expiresAt?: string;
+  enrolledAt: Date;
+  progressPercentage: number;
 }
 
 // ─── Video Progress ───────────────────────────────────────────────────────────
 
 export interface IVideoProgress {
-  _id: string;
-  user: string;
-  course: string;
-  video: string;
-  watchedSeconds: number;
-  durationSeconds: number;
-  isCompleted: boolean;
-  lastWatchedAt: string;
-}
-
-export interface ICourseProgress {
+  id: string;
+  userId: string;
   courseId: string;
-  totalVideos: number;
-  completedVideos: number;
-  percentComplete: number;
-  videoProgressMap: Record<string, IVideoProgress>;
-}
-
-// ─── API Response Wrappers ────────────────────────────────────────────────────
-
-export interface ApiResponse<T = unknown> {
-  success: boolean;
-  message: string;
-  data: T;
-}
-
-export interface PaginatedResponse<T = unknown> {
-  success: boolean;
-  message: string;
-  data: T[];
-  pagination: {
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-  };
-}
-
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken?: string;
-}
-
-export interface LoginPayload {
-  email: string;
-  password: string;
-}
-
-export interface RegisterPayload {
-  name: string;
-  email: string;
-  password: string;
-  phone?: string;
+  videoId: string;
+  watchedSeconds: number;
+  isCompleted: boolean;
+  lastWatchedAt: Date;
 }
 
 // ─── Testimonial ─────────────────────────────────────────────────────────────
 
 export interface ITestimonial {
-  _id: string;
-  user: Pick<IUser, '_id' | 'name' | 'avatar' | 'city'>;
-  course: Pick<ICourse, '_id' | 'title'>;
-  quote: string;
+  id: string;
+  studentName: string;
+  city: string;
   rating: number;
+  quoteHindi: string;
+  quoteEnglish: string;
+  courseEnrolled?: string;
 }
+
+// ─── FAQ ─────────────────────────────────────────────────────────────────────
+
+export interface IFaqItem {
+  id: string;
+  questionHindi: string;
+  questionEnglish: string;
+  answerHindi: string;
+  answerEnglish: string;
+}
+
+// ─── API wrappers ─────────────────────────────────────────────────────────────
+
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+}
+
+export interface PaginatedResponse<T> extends ApiResponse<T[]> {
+  total: number;
+  page: number;
+  limit: number;
+  hasNextPage: boolean;
+}
+
+// ─── ThumbnailGradientMap ─────────────────────────────────────────────────────
+// Runtime const — used by CourseCard to look up Tailwind gradient classes.
+// All classes are safelisted in tailwind.config.js.
+
+export const ThumbnailGradientMap: Record<ThumbnailColour, string> = {
+  rose:       'bg-gradient-to-br from-rose-100 to-rose-300',
+  amber:      'bg-gradient-to-br from-amber-100 to-amber-300',
+  terracotta: 'bg-gradient-to-br from-red-100 via-orange-200 to-red-300',
+  marigold:   'bg-gradient-to-br from-yellow-100 via-amber-200 to-orange-200',
+  burgundy:   'bg-gradient-to-br from-rose-200 via-pink-300 to-red-400',
+  saffron:    'bg-gradient-to-br from-orange-100 via-amber-200 to-yellow-200',
+};

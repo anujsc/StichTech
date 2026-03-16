@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 
 import LandingPage from '@/pages/LandingPage';
+import DesignSystemTestPage from '@/pages/DesignSystemTestPage';
 import CourseCatalogPage from '@/pages/CourseCatalogPage';
 import CourseDetailPage from '@/pages/CourseDetailPage';
 import LoginPage from '@/pages/LoginPage';
@@ -26,11 +27,12 @@ function AdminRoute() {
 
 export const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
+  { path: '/design-system', element: <DesignSystemTestPage /> },
   { path: '/courses', element: <CourseCatalogPage /> },
-  { path: '/courses/:slug', element: <CourseDetailPage /> },
+  { path: '/courses/:courseId', element: <CourseDetailPage /> },
   { path: '/login', element: <LoginPage /> },
 
-  // Protected student routes
+  // Protected student routes (no path — just a guard)
   {
     element: <PrivateRoute />,
     children: [
@@ -39,7 +41,7 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Protected admin routes
+  // Protected admin routes  (no path — just a guard)
   {
     element: <AdminRoute />,
     children: [

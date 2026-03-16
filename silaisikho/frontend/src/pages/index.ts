@@ -1,0 +1,11 @@
+export { default as LandingPage } from './LandingPage';
+export { default as CourseCatalogPage } from './CourseCatalogPage';
+export { default as CourseDetailPage } from './CourseDetailPage';
+export { default as LoginPage } from './LoginPage';
+export { default as StudentDashboardPage } from './StudentDashboardPage';
+export { default as WatchVideoPage } from './WatchVideoPage';
+export { default as AdminDashboardPage } from './AdminDashboardPage';
+export { default as AdminCoursesPage } from './AdminCoursesPage';
+export { default as AdminCourseEditorPage } from './AdminCourseEditorPage';
+export { default as AdminStudentsPage } from './AdminStudentsPage';
+export { default as DesignSystemTestPage } from './DesignSystemTestPage';

@@ -4,25 +4,59 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --color-brand: #C0392B;
-  --color-brand-light: #E74C3C;
-  --color-brand-dark: #96281B;
-  --color-gold: #D4A017;
-  --color-gold-light: #F0C040;
-  --color-gold-dark: #A07810;
-  --color-surface: #FDF6EC;
-  --color-surface-dark: #F5E6D0;
-  --color-navy: #1A2744;
-  --color-navy-light: #2C3E6B;
-  --color-muted: #F8F4EF;
-  --color-border-warm: #E8D5B7;
-  --color-text-warm: #5C4A32;
+@layer base {
+  body {
+    background-color: #FDF8F2;
+    font-family: 'Hind', ui-sans-serif, system-ui, sans-serif;
+    color: #1A1A2E;
+    line-height: 1.75;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    color: #1A1A2E;
+  }
+
+  button {
+    outline: none;
+    cursor: pointer;
+  }
+
+  input, textarea {
+    outline: none;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #FDF8F2;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #EAE0D5;
+    border-radius: 9999px;
+  }
 }
 
-body {
-  font-family: 'Hind', ui-sans-serif, system-ui, sans-serif;
-  background-color: var(--color-surface);
-  line-height: 1.75;
-  color: var(--color-navy);
+@layer components {
+  .page-enter {
+    animation: fadeIn 200ms ease-out forwards;
+  }
+}
+
+:root {
+  --color-brand: #C0392B;
+  --color-gold: #C9A84C;
+  --color-navy: #1A1A2E;
+  --color-surface: #FDF8F2;
+  --color-muted: #F5EFE6;
+  --color-warm-border: #EAE0D5;
+  --color-warm-text: #7B6B5D;
+  --color-card: #FFFFFF;
 }
