@@ -1,0 +1,28 @@
+@import url('https://fonts.googleapis.com/css2?family=Hind:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-brand: #C0392B;
+  --color-brand-light: #E74C3C;
+  --color-brand-dark: #96281B;
+  --color-gold: #D4A017;
+  --color-gold-light: #F0C040;
+  --color-gold-dark: #A07810;
+  --color-surface: #FDF6EC;
+  --color-surface-dark: #F5E6D0;
+  --color-navy: #1A2744;
+  --color-navy-light: #2C3E6B;
+  --color-muted: #F8F4EF;
+  --color-border-warm: #E8D5B7;
+  --color-text-warm: #5C4A32;
+}
+
+body {
+  font-family: 'Hind', ui-sans-serif, system-ui, sans-serif;
+  background-color: var(--color-surface);
+  line-height: 1.75;
+  color: var(--color-navy);
+}
