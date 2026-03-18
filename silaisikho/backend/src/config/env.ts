@@ -10,11 +10,11 @@ const envSchema = z.object({
   // Database — required now (Phase 2.1)
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
 
-  // JWT — required when auth routes are implemented (Phase 2.3+)
-  JWT_ACCESS_SECRET: z.string().optional(),
-  JWT_REFRESH_SECRET: z.string().optional(),
+  // JWT — required from Phase 3.2 onwards
+  JWT_ACCESS_SECRET: z.string().min(32, 'JWT access secret must be at least 32 characters'),
+  JWT_REFRESH_SECRET: z.string().min(32, 'JWT refresh secret must be at least 32 characters — must be different from access secret'),
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
-  JWT_REFRESH_EXPIRY: z.string().default('7d'),
+  JWT_REFRESH_EXPIRY: z.string().default('30d'),
 
   // Google OAuth — required when OAuth is implemented
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -40,7 +40,16 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().optional(),
 });
 
-const parsed = envSchema.safeParse(process.env);
+const refinedSchema = envSchema.refine(
+  (data) => data.JWT_ACCESS_SECRET !== data.JWT_REFRESH_SECRET,
+  {
+    message:
+      'JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different values — using the same secret for both tokens allows a refresh token to be used as an access token',
+    path: ['JWT_REFRESH_SECRET'],
+  }
+);
+
+const parsed = refinedSchema.safeParse(process.env);
 
 if (!parsed.success) {
   console.error('❌ Invalid environment variables:');
