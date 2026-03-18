@@ -9,3 +9,5 @@ export { default as AdminCoursesPage } from './AdminCoursesPage';
 export { default as AdminCourseEditorPage } from './AdminCourseEditorPage';
 export { default as AdminStudentsPage } from './AdminStudentsPage';
 export { default as DesignSystemTestPage } from './DesignSystemTestPage';
+export { default as NotFoundPage } from './NotFoundPage';
+export { default as ProfilePage } from './ProfilePage';

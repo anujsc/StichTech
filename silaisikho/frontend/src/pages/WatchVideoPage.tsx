@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Play, Pause, CheckCircle, Circle, ChevronDown, ChevronUp, ArrowLeft, List } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button, ProgressBar, EmptyState, BilingualLabel } from '@/components/ui';
-import { MOCK_COURSES, MOCK_VIDEO_PROGRESS, MOCK_STUDENTS } from '@/mockData';
+import { MOCK_COURSES, MOCK_VIDEO_PROGRESS, MOCK_STUDENTS, MOCK_ENROLLMENTS } from '@/mockData';
 import { ThumbnailGradientMap } from '@/types';
+import { useAuth } from '@/context/AuthContext';
 import type { IVideo, IModule } from '@/types';
 
 const CURRENT_USER = MOCK_STUDENTS[0];
@@ -20,6 +21,7 @@ function fmtDur(s: number): string {
 export default function WatchVideoPage() {
   const { courseId, videoId } = useParams<{ courseId: string; videoId: string }>();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
 
   const course = useMemo(() => MOCK_COURSES.find((c) => c.id === courseId), [courseId]);
 
@@ -49,6 +51,19 @@ export default function WatchVideoPage() {
     ),
     [courseId]
   );
+
+  // Enrollment check — redirect if not enrolled and video is not free preview
+  const isEnrolled = useMemo(() => {
+    const userId = currentUser?.id ?? CURRENT_USER.id;
+    return MOCK_ENROLLMENTS.some((e) => e.userId === userId && e.courseId === courseId);
+  }, [currentUser, courseId]);
+
+  useEffect(() => {
+    if (!course || !currentVideo) return;
+    if (!isEnrolled && !currentVideo.isFreePreview) {
+      navigate(`/courses/${courseId}`, { replace: true });
+    }
+  }, [course, currentVideo, isEnrolled, courseId, navigate]);
 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [scrubValue, setScrubValue] = useState<number>(0);
@@ -118,7 +133,7 @@ export default function WatchVideoPage() {
           englishWeight="semibold"
           hindiSize="xs"
           gap="tight"
-          className="text-white/90 max-w-[200px] sm:max-w-xs truncate"
+          className="text-white/90 max-w-[140px] sm:max-w-xs truncate"
         />
 
         {/* Mobile sidebar toggle */}

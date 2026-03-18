@@ -4,12 +4,10 @@ import { Play, BookOpen, TrendingUp, IndianRupee } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button, Badge, ProgressBar, Avatar, EmptyState, BilingualLabel } from '@/components/ui';
 import { Navbar, CourseCard } from '@/components/shared';
-import { MOCK_STUDENTS, MOCK_ENROLLMENTS, MOCK_COURSES, MOCK_VIDEO_PROGRESS } from '@/mockData';
+import { MOCK_ENROLLMENTS, MOCK_COURSES, MOCK_VIDEO_PROGRESS, MOCK_STUDENTS } from '@/mockData';
 import { ThumbnailGradientMap } from '@/types';
+import { useAuth } from '@/context/AuthContext';
 import type { IEnrollment } from '@/types';
-
-// Simulated logged-in student
-const CURRENT_USER = MOCK_STUDENTS[0];
 
 function fmtDate(d: Date): string {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -20,12 +18,16 @@ type DashboardTab = 'courses' | 'history';
 export default function StudentDashboardPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>('courses');
+
+  // Fall back to first mock student if somehow no user (shouldn't happen — PrivateRoute guards this)
+  const user = currentUser ?? MOCK_STUDENTS[0];
 
   // Enrollments for current user
   const myEnrollments = useMemo<IEnrollment[]>(
-    () => MOCK_ENROLLMENTS.filter((e) => e.userId === CURRENT_USER.id),
-    []
+    () => MOCK_ENROLLMENTS.filter((e) => e.userId === user.id),
+    [user.id]
   );
 
   // Continue watching = enrollment with highest progress that isn't 100%
@@ -39,7 +41,7 @@ export default function StudentDashboardPage() {
   const continueVideo = useMemo(() => {
     if (!continueEnrollment) return null;
     const progEntries = MOCK_VIDEO_PROGRESS
-      .filter((vp) => vp.userId === CURRENT_USER.id && vp.courseId === continueEnrollment.courseId)
+      .filter((vp) => vp.userId === user.id && vp.courseId === continueEnrollment.courseId)
       .sort((a, b) => b.lastWatchedAt.getTime() - a.lastWatchedAt.getTime());
     if (!progEntries.length) return null;
     const course = MOCK_COURSES.find((c) => c.id === continueEnrollment.courseId);
@@ -49,7 +51,7 @@ export default function StudentDashboardPage() {
       if (v) return v;
     }
     return null;
-  }, [continueEnrollment]);
+  }, [continueEnrollment, user.id]);
 
   // Courses for the grid
   const enrolledCourses = useMemo(
@@ -59,7 +61,6 @@ export default function StudentDashboardPage() {
     })).filter((x): x is { enr: IEnrollment; course: NonNullable<typeof x.course> } => !!x.course),
     [myEnrollments]
   );
-
   const stats = useMemo(() => ({
     total: myEnrollments.length,
     completed: myEnrollments.filter((e) => e.progressPercentage === 100).length,
@@ -76,17 +77,17 @@ export default function StudentDashboardPage() {
 
         {/* Greeting */}
         <div className="flex items-center gap-4 mb-8">
-          <Avatar name={CURRENT_USER.name} size="lg" />
+          <Avatar name={user.name} size="lg" />
           <div>
             <BilingualLabel
-              english={`Welcome back, ${CURRENT_USER.name.split(' ')[0]}`}
-              hindi={`नमस्ते, ${CURRENT_USER.name.split(' ')[0]}`}
+              english={`Welcome back, ${user.name.split(' ')[0]}`}
+              hindi={`नमस्ते, ${user.name.split(' ')[0]}`}
               englishSize="xl"
               englishWeight="bold"
               hindiSize="sm"
               gap="tight"
             />
-            <p className="text-warm-text text-sm mt-0.5">{CURRENT_USER.email}</p>
+            <p className="text-warm-text text-sm mt-0.5">{user.email}</p>
           </div>
         </div>
 

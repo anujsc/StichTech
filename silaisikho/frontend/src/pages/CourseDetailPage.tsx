@@ -9,6 +9,7 @@ import { Button, Badge, PriceDisplay, Avatar, EmptyState, BilingualLabel } from 
 import { Navbar, VideoPlayerModal } from '@/components/shared';
 import { MOCK_COURSES } from '@/mockData';
 import { ThumbnailGradientMap } from '@/types';
+import { useAuth } from '@/context/AuthContext';
 import type { IVideo, CourseLevel } from '@/types';
 
 function fmtDur(s: number): string {
@@ -45,6 +46,7 @@ export default function CourseDetailPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { isAdmin } = useAuth();
 
   const course = MOCK_COURSES.find((c) => c.id === courseId);
 
@@ -227,7 +229,11 @@ export default function CourseDetailPage() {
           <div className="hidden lg:block">
             <div className="sticky top-24 bg-card rounded-2xl shadow-card p-6">
               <PriceDisplay price={displayPrice} originalPrice={course.discountedPrice !== undefined ? course.price : undefined} size="lg" className="mb-4" />
-              {!isEnrolled ? (
+              {isAdmin ? (
+                <div className="flex items-center gap-2 bg-muted rounded-xl px-4 py-3">
+                  <span className="text-brand text-sm font-semibold">Admin View — एडमिन व्यू</span>
+                </div>
+              ) : !isEnrolled ? (
                 <>
                   <Button variant="primary" size="lg" fullWidth loading={buyLoading} onClick={handleBuy} className="mb-3">
                     अभी खरीदें — Buy Now
@@ -261,7 +267,9 @@ export default function CourseDetailPage() {
       {/* Mobile sticky bar */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-warm-border px-4 py-3 flex items-center justify-between z-50">
         <PriceDisplay price={displayPrice} originalPrice={course.discountedPrice !== undefined ? course.price : undefined} size="md" />
-        {!isEnrolled
+        {isAdmin ? (
+          <span className="text-brand text-sm font-semibold">Admin View</span>
+        ) : !isEnrolled
           ? <Button variant="primary" size="md" loading={buyLoading} onClick={handleBuy}>अभी खरीदें</Button>
           : <Button variant="primary" size="md" onClick={() => navigate(`/watch/${course.id}/${course.modules[0].videos[0].id}`)}>जारी रखें</Button>
         }

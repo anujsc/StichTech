@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Button, Spinner, BilingualLabel } from '@/components/ui';
 import { Navbar } from '@/components/shared';
+import { useAuth } from '@/context/AuthContext';
+import { MOCK_ADMIN, MOCK_STUDENTS } from '@/mockData';
 
 type LoginStep = 'email' | 'otp';
 
@@ -12,6 +14,14 @@ const RESEND_SECONDS = 30;
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { login, isLoggedIn, isAdmin } = useAuth();
+
+  // Already logged in — redirect away
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigate(isAdmin ? '/admin' : '/dashboard', { replace: true });
+    }
+  }, [isLoggedIn, isAdmin, navigate]);
 
   const [step, setStep] = useState<LoginStep>('email');
   const [email, setEmail] = useState<string>('');
@@ -100,17 +110,26 @@ export default function LoginPage() {
     setOtpLoading(true);
     setTimeout(() => {
       setOtpLoading(false);
-      navigate('/dashboard');
+      const isAdminEmail = email.toLowerCase().includes('admin');
+      // New user — name is placeholder, route to profile setup
+      const user = isAdminEmail
+        ? MOCK_ADMIN
+        : { ...MOCK_STUDENTS[0], id: Date.now().toString(), email, name: 'New User' };
+      const tok = isAdminEmail ? 'mock-admin-token' : 'mock-student-token';
+      login(user, tok);
+      // Admin goes straight to dashboard; new students complete profile first
+      navigate(isAdminEmail ? '/admin' : '/profile', { state: { from: '/dashboard' } });
     }, 1200);
-  }, [otp, navigate]);
+  }, [otp, email, login, navigate]);
 
   const handleGoogleLogin = useCallback(() => {
     setGoogleLoading(true);
     setTimeout(() => {
       setGoogleLoading(false);
+      login(MOCK_STUDENTS[0], 'mock-student-token');
       navigate('/dashboard');
     }, 1500);
-  }, [navigate]);
+  }, [login, navigate]);
 
   return (
     <div className="page-enter min-h-screen bg-surface flex flex-col">
@@ -209,7 +228,7 @@ export default function LoginPage() {
                     onChange={(e) => handleOtpChange(i, e.target.value)}
                     onKeyDown={(e) => handleOtpKeyDown(i, e)}
                     onPaste={i === 0 ? handleOtpPaste : undefined}
-                    className="w-11 h-14 text-center text-navy text-xl font-bold border border-warm-border rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors"
+                    className="w-10 h-12 sm:w-11 sm:h-14 text-center text-navy text-xl font-bold border border-warm-border rounded-xl focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors"
                   />
                 ))}
               </div>

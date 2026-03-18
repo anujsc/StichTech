@@ -1,5 +1,6 @@
-import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet, RouterProvider } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useScrollToTop } from '@/hooks/useScrollToTop';
 
 import LandingPage from '@/pages/LandingPage';
 import DesignSystemTestPage from '@/pages/DesignSystemTestPage';
@@ -12,7 +13,10 @@ import AdminDashboardPage from '@/pages/AdminDashboardPage';
 import AdminCoursesPage from '@/pages/AdminCoursesPage';
 import AdminCourseEditorPage from '@/pages/AdminCourseEditorPage';
 import AdminStudentsPage from '@/pages/AdminStudentsPage';
+import NotFoundPage from '@/pages/NotFoundPage';
+import ProfilePage from '@/pages/ProfilePage';
 
+// ─── Guards ───────────────────────────────────────────────────────────────────
 function PrivateRoute() {
   const { isLoggedIn } = useAuth();
   return isLoggedIn ? <Outlet /> : <Navigate to="/login" replace />;
@@ -25,30 +29,47 @@ function AdminRoute() {
   return <Outlet />;
 }
 
-export const router = createBrowserRouter([
-  { path: '/', element: <LandingPage /> },
-  { path: '/design-system', element: <DesignSystemTestPage /> },
-  { path: '/courses', element: <CourseCatalogPage /> },
-  { path: '/courses/:courseId', element: <CourseDetailPage /> },
-  { path: '/login', element: <LoginPage /> },
+// ─── Root layout — scroll-to-top lives here ───────────────────────────────────
+function RootLayout() {
+  useScrollToTop();
+  return <Outlet />;
+}
 
-  // Protected student routes (no path — just a guard)
+// ─── Router ───────────────────────────────────────────────────────────────────
+const router = createBrowserRouter([
   {
-    element: <PrivateRoute />,
+    element: <RootLayout />,
     children: [
-      { path: '/dashboard', element: <StudentDashboardPage /> },
-      { path: '/watch/:courseId/:videoId', element: <WatchVideoPage /> },
-    ],
-  },
+      { index: true, element: <LandingPage /> },
+      { path: '/design-system', element: <DesignSystemTestPage /> },
+      { path: '/courses', element: <CourseCatalogPage /> },
+      { path: '/courses/:courseId', element: <CourseDetailPage /> },
+      { path: '/login', element: <LoginPage /> },
+      { path: '/profile', element: <ProfilePage /> },
 
-  // Protected admin routes  (no path — just a guard)
-  {
-    element: <AdminRoute />,
-    children: [
-      { path: '/admin', element: <AdminDashboardPage /> },
-      { path: '/admin/courses', element: <AdminCoursesPage /> },
-      { path: '/admin/courses/:courseId/edit', element: <AdminCourseEditorPage /> },
-      { path: '/admin/students', element: <AdminStudentsPage /> },
+      {
+        element: <PrivateRoute />,
+        children: [
+          { path: '/dashboard', element: <StudentDashboardPage /> },
+          { path: '/watch/:courseId/:videoId', element: <WatchVideoPage /> },
+        ],
+      },
+
+      {
+        element: <AdminRoute />,
+        children: [
+          { path: '/admin', element: <AdminDashboardPage /> },
+          { path: '/admin/courses', element: <AdminCoursesPage /> },
+          { path: '/admin/courses/:courseId/edit', element: <AdminCourseEditorPage /> },
+          { path: '/admin/students', element: <AdminStudentsPage /> },
+        ],
+      },
+
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ]);
+
+export default function AppRouter() {
+  return <RouterProvider router={router} />;
+}

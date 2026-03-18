@@ -34,10 +34,10 @@ function HeroSection() {
             New Courses Available — नए कोर्स उपलब्ध हैं
           </span>
           <div>
-            <h1 className="font-extrabold text-4xl md:text-5xl text-navy leading-tight">
+            <h1 className="font-extrabold text-3xl md:text-5xl text-navy leading-tight">
               घर बैठे सीखें सिलाई
             </h1>
-            <h1 className="font-extrabold text-4xl md:text-5xl text-brand leading-tight">
+            <h1 className="font-extrabold text-3xl md:text-5xl text-brand leading-tight">
               Professional Tailoring
             </h1>
           </div>
@@ -298,7 +298,7 @@ function Footer() {
   return (
     <footer className="bg-navy pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8 mb-10">
           <div className="col-span-2 md:col-span-1">
             <p className="text-white font-bold text-lg mb-2">SilaiSikho</p>
             <p className="text-white/50 text-sm leading-relaxed mb-4">

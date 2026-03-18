@@ -1,24 +1,26 @@
-import express from 'express';
-import dotenv from 'dotenv';
+import express, { Application } from 'express';
+import { env } from '@/config/env';
+import connectDB from '@/config/database';
 
-dotenv.config();
+// Import models before any route registration — order reflects reference dependency chain
+import '@/models/User';
+import '@/models/Course';
+import '@/models/Enrollment';
+import '@/models/VideoProgress';
+import '@/models/OtpSession';
 
-// TODO: import connectDB from './config/db'
-// TODO: import app from './app'
-// TODO: import { env } from './config/env'
+const app: Application = express();
 
-const app = express();
+// ─── Bootstrap ────────────────────────────────────────────────────────────────
+async function bootstrap(): Promise<void> {
+  // Database must be connected before the server accepts any requests
+  await connectDB();
 
-// TODO: Register middleware (helmet, cors, morgan, cookieParser, express.json)
-// TODO: Register routes
-// TODO: Register global error handler
+  app.listen(Number(env.PORT), () => {
+    console.log(`Server running on port ${env.PORT} [${env.NODE_ENV}]`);
+  });
+}
 
-const PORT = process.env.PORT || 5000;
-
-// TODO: connectDB().then(() => {
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-// });
+bootstrap();
 
 export default app;

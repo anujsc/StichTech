@@ -1,5 +1,5 @@
 import { useState, ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Video, Upload, Users,
   Menu, LogOut, X,
@@ -7,6 +7,7 @@ import {
 import { clsx } from 'clsx';
 import { Avatar, BilingualLabel } from '@/components/ui';
 import { MOCK_ADMIN } from '@/mockData';
+import { useAuth } from '@/context/AuthContext';
 
 export interface AdminLayoutProps {
   pageTitle: string;
@@ -29,6 +30,13 @@ const NAV_ITEMS: SideNavItem[] = [
 ];
 
 function SidebarContent({ onClose }: { onClose?: () => void }) {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
   return (
     <div className="flex flex-col h-full bg-navy">
       {/* Logo */}
@@ -95,7 +103,7 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
             <span className="text-gold text-[11px] mt-0.5 capitalize">{MOCK_ADMIN.role}</span>
           </div>
         </div>
-        <button className="flex items-center gap-2 text-warm-text text-[12px] hover:text-white transition-colors duration-150 min-h-[36px]">
+        <button onClick={handleLogout} className="flex items-center gap-2 text-warm-text text-[12px] hover:text-white transition-colors duration-150 min-h-[36px]">
           <LogOut size={14} />
           <span>Logout</span>
         </button>
