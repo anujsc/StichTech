@@ -7,6 +7,26 @@ const envSchema = z.object({
   PORT: z.string().default('5000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
+  // CORS — required for frontend communication
+  CORS_ORIGIN: z
+    .string()
+    .default('http://localhost:5173')
+    .refine(
+      (val) => {
+        // Allow single URL or comma-separated list of URLs
+        const origins = val.split(',').map((o) => o.trim());
+        return origins.every((origin) => {
+          try {
+            new URL(origin);
+            return true;
+          } catch {
+            return false;
+          }
+        });
+      },
+      { message: 'CORS_ORIGIN must be a valid URL or comma-separated list of URLs' }
+    ),
+
   // Database — required now (Phase 2.1)
   MONGODB_URI: z.string().min(1, 'MONGODB_URI is required'),
 

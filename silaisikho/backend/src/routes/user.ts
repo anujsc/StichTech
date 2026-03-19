@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getProfile, updateProfile, changePin } from '@/controllers/userController';
-import { isAuthenticated, verifyCurrentPin } from '@/middleware/index';
+import { isAuthenticated, verifyCurrentPin, changePinRateLimiter } from '@/middleware/index';
 
 const router = Router();
 
@@ -11,6 +11,6 @@ router.get('/profile', isAuthenticated, getProfile);
 router.patch('/profile', isAuthenticated, updateProfile);
 
 // PATCH /api/users/change-pin — verifies current PIN then updates to new PIN
-router.patch('/change-pin', isAuthenticated, verifyCurrentPin, changePin);
+router.patch('/change-pin', changePinRateLimiter, isAuthenticated, verifyCurrentPin, changePin);
 
 export default router;

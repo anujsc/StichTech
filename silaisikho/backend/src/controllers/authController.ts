@@ -3,7 +3,7 @@ import passport from 'passport';
 import User from '@/models/User';
 import type { IUserDocument } from '@/models/User';
 import { registerUser } from '@/config/passport';
-import { generateAuthTokens, verifyRefreshToken, setRefreshTokenCookie, clearRefreshTokenCookie, sanitizeUser } from '@/utils/index';
+import { generateAuthTokens, verifyRefreshToken, setRefreshTokenCookie, clearRefreshTokenCookie, sanitizeUser, sendSuccess, sendError } from '@/utils/index';
 import { REGISTER_SCHEMA, LOGIN_SCHEMA } from '@/validators/auth';
 import { asyncHandler } from '@/middleware/asyncHandler';
 
@@ -12,11 +12,7 @@ import { asyncHandler } from '@/middleware/asyncHandler';
 export const register = asyncHandler(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = REGISTER_SCHEMA.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors: parsed.error.format(),
-    });
+    sendError(res, 'Validation failed', 400);
     return;
   }
 
@@ -29,11 +25,11 @@ export const register = asyncHandler(async (req: Request, res: Response, next: N
   } catch (err) {
     const message = (err as Error).message;
     if (message.includes('already exists')) {
-      res.status(409).json({ success: false, message });
+      sendError(res, message, 409);
       return;
     }
     if (message.includes('PIN')) {
-      res.status(400).json({ success: false, message });
+      sendError(res, message, 400);
       return;
     }
     next(err);
@@ -43,15 +39,11 @@ export const register = asyncHandler(async (req: Request, res: Response, next: N
   const { accessToken, refreshToken, expiresIn } = await generateAuthTokens(createdUser);
   setRefreshTokenCookie(res, refreshToken);
 
-  res.status(201).json({
-    success: true,
-    message: 'Account created successfully — अकाउंट बन गया',
-    data: {
-      user: sanitizeUser(createdUser),
-      accessToken,
-      expiresIn,
-    },
-  });
+  sendSuccess(res, {
+    user: sanitizeUser(createdUser),
+    accessToken,
+    expiresIn,
+  }, 'Account created successfully — अकाउंट बन गया', 201);
 });
 
 // ─── login ────────────────────────────────────────────────────────────────────
@@ -59,11 +51,7 @@ export const register = asyncHandler(async (req: Request, res: Response, next: N
 export const login = asyncHandler(async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = LOGIN_SCHEMA.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors: parsed.error.format(),
-    });
+    sendError(res, 'Validation failed', 400);
     return;
   }
 
@@ -75,25 +63,18 @@ export const login = asyncHandler(async (req: Request, res: Response, next: Next
       if (err) { next(err); return; }
 
       if (!user) {
-        res.status(401).json({
-          success: false,
-          message: info?.message ?? 'Invalid credentials — गलत जानकारी',
-        });
+        sendError(res, info?.message ?? 'Invalid credentials — गलत जानकारी', 401);
         return;
       }
 
       const { accessToken, refreshToken, expiresIn } = await generateAuthTokens(user);
       setRefreshTokenCookie(res, refreshToken);
 
-      res.status(200).json({
-        success: true,
-        message: 'Login successful — लॉगिन सफल रहा',
-        data: {
-          user: sanitizeUser(user),
-          accessToken,
-          expiresIn,
-        },
-      });
+      sendSuccess(res, {
+        user: sanitizeUser(user),
+        accessToken,
+        expiresIn,
+      }, 'Login successful — लॉगिन सफल रहा', 200);
     }
   );
 
@@ -106,7 +87,7 @@ export const refresh = asyncHandler(async (req: Request, res: Response): Promise
   const token = req.cookies.refreshToken as string | undefined;
 
   if (!token) {
-    res.status(401).json({ success: false, message: 'No refresh token provided — refresh token नहीं मिला' });
+    sendError(res, 'No refresh token provided — refresh token नहीं मिला', 401);
     return;
   }
 
@@ -118,29 +99,25 @@ export const refresh = asyncHandler(async (req: Request, res: Response): Promise
     userId = payload.userId;
     tokenVersion = payload.tokenVersion;
   } catch {
-    res.status(401).json({ success: false, message: 'Refresh token is invalid or expired — refresh token अमान्य या expire हो गया' });
+    sendError(res, 'Refresh token is invalid or expired — refresh token अमान्य या expire हो गया', 401);
     return;
   }
 
   const user = await User.findById(userId);
   if (!user) {
-    res.status(401).json({ success: false, message: 'User not found — यूजर नहीं मिला' });
+    sendError(res, 'User not found — यूजर नहीं मिला', 401);
     return;
   }
 
   if (tokenVersion !== user.tokenVersion) {
-    res.status(401).json({ success: false, message: 'Session expired — please log in again — सेशन expire हो गया, कृपया दोबारा लॉगिन करें' });
+    sendError(res, 'Session expired — please log in again — सेशन expire हो गया, कृपया दोबारा लॉगिन करें', 401);
     return;
   }
 
   const { accessToken, refreshToken: newRefreshToken, expiresIn } = await generateAuthTokens(user);
   setRefreshTokenCookie(res, newRefreshToken);
 
-  res.status(200).json({
-    success: true,
-    message: 'Token refreshed',
-    data: { accessToken, expiresIn },
-  });
+  sendSuccess(res, { accessToken, expiresIn }, 'Token refreshed', 200);
 });
 
 // ─── logout ───────────────────────────────────────────────────────────────────
@@ -156,5 +133,5 @@ export const logout = asyncHandler(async (req: Request, res: Response): Promise<
     }
   }
 
-  res.status(200).json({ success: true, message: 'Logged out successfully — लॉगआउट सफल रहा' });
+  sendSuccess(res, undefined, 'Logged out successfully — लॉगआउट सफल रहा', 200);
 });
