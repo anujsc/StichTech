@@ -1,72 +1,120 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 
-const TOKEN_KEY = 'silaisikho_token';
+// ─── Token Store ──────────────────────────────────────────────────────────────
+// Module-level variable that AuthContext writes to and interceptors read from.
+// The access token lives in memory only, never in localStorage.
 
-const axiosInstance = axios.create({
+export const tokenStore = {
+  accessToken: null as string | null,
+  setToken(token: string | null): void {
+    this.accessToken = token;
+  },
+  getToken(): string | null {
+    return this.accessToken;
+  },
+};
+
+// ─── Axios Instance ───────────────────────────────────────────────────────────
+
+const axiosInstance: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL as string,
+  timeout: 15000,
   withCredentials: true,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
-// ─── Request interceptor — attach Bearer token ────────────────────────────────
-axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// ─── Request Interceptor ──────────────────────────────────────────────────────
+// Attaches the Bearer token to every request.
 
-// ─── Response interceptor — handle 401 with token refresh ────────────────────
+axiosInstance.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    const token = tokenStore.getToken();
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// ─── Response Interceptor ─────────────────────────────────────────────────────
+// Handles 401 responses by attempting a token refresh and retrying the request.
+// Concurrent refresh attempts are serialized using isRefreshing and refreshPromise.
+
 let isRefreshing = false;
-let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
-
-function processQueue(error: unknown, token: string | null) {
-  failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token!)));
-  failedQueue = [];
-}
+let refreshPromise: Promise<string | null> | null = null;
 
 axiosInstance.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+  (response: AxiosResponse) => response,
+  async (error: any) => {
+    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({
-            resolve: (token) => {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
-              resolve(axiosInstance(originalRequest));
-            },
-            reject,
-          });
-        });
-      }
+    // Check if this is a 401 that should trigger a refresh
+    const should401Refresh =
+      error.response &&
+      error.response.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry;
 
-      originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const { data } = await axiosInstance.post<{ data: { accessToken: string } }>(
-          '/auth/refresh-token'
-        );
-        const newToken = data.data.accessToken;
-        localStorage.setItem(TOKEN_KEY, newToken);
-        axiosInstance.defaults.headers.common.Authorization = `Bearer ${newToken}`;
-        processQueue(null, newToken);
-        originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        return axiosInstance(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError, null);
-        localStorage.removeItem(TOKEN_KEY);
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
-      }
+    if (!should401Refresh) {
+      return Promise.reject(error);
     }
 
-    return Promise.reject(error);
+    // Mark this request as retried to prevent infinite loops
+    originalRequest._retry = true;
+
+    // If a refresh is already in progress, wait for it
+    if (isRefreshing && refreshPromise) {
+      return refreshPromise.then((newToken) => {
+        if (newToken && originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        }
+        return axiosInstance(originalRequest);
+      });
+    }
+
+    // Start a new refresh attempt
+    isRefreshing = true;
+    refreshPromise = new Promise<string | null>(async (resolve, reject) => {
+      try {
+        // Use a separate axios instance for the refresh call to avoid circular interceptor logic
+        const refreshAxios = axios.create({
+          baseURL: import.meta.env.VITE_API_URL as string,
+          withCredentials: true,
+        });
+
+        const response = await refreshAxios.post('/auth/refresh');
+        const newToken = response.data.data?.accessToken;
+
+        if (newToken) {
+          tokenStore.setToken(newToken);
+          resolve(newToken);
+        } else {
+          tokenStore.setToken(null);
+          reject(new Error('No access token in refresh response'));
+        }
+      } catch (refreshError) {
+        tokenStore.setToken(null);
+        reject(refreshError);
+      } finally {
+        isRefreshing = false;
+        refreshPromise = null;
+      }
+    });
+
+    try {
+      const newToken = await refreshPromise;
+      if (newToken && originalRequest.headers) {
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+      }
+      return axiosInstance(originalRequest);
+    } catch (refreshError) {
+      // Refresh failed — redirect to login
+      window.location.href = '/login';
+      return Promise.reject(refreshError);
+    }
   }
 );
 

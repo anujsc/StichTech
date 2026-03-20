@@ -18,3 +18,5 @@ export type { FormDrawerProps } from './FormDrawer';
 
 export { ToastProvider, useToast } from './ToastProvider';
 export type { Toast, ToastContextType, ToastVariant } from './ToastProvider';
+
+export { DemoRoleSwitcher } from './DemoRoleSwitcher';

@@ -1,103 +1,180 @@
-import { createContext, useContext, useState, useEffect, ReactNode, Fragment } from 'react';
-import type { IUser, UserRole } from '@/types';
-import { MOCK_ADMIN, MOCK_STUDENTS } from '@/mockData';
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode, Fragment } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { BackendUser } from '@/types/api';
+import { tokenStore } from '@/api/axiosInstance';
+import { loginUser, logoutUser, refreshTokens, registerUser, getMyProfile } from '@/api/authApi';
+import { Spinner } from '@/components/ui';
+import { DemoRoleSwitcher } from '@/components/shared/DemoRoleSwitcher';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── AuthContextType ──────────────────────────────────────────────────────────
+
 export interface AuthContextType {
-  currentUser: IUser | null;
+  currentUser: BackendUser | null;
+  accessToken: string | null;
+  token: string | null; // Alias for backward compatibility with pages
   isLoggedIn: boolean;
   isAdmin: boolean;
-  token: string | null;
-  login: (user: IUser, token: string) => void;
-  logout: () => void;
-  switchRole: (role: UserRole) => void;
+  isLoading: boolean;
+  login: ((identifier: string, pin: string) => Promise<void>) & ((user: any, token: string) => void);
+  register: (name: string, identifier: string, pin: string) => Promise<void>;
+  logout: () => Promise<void>;
+  updateCurrentUser: (updates: Partial<BackendUser>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// ─── DemoRoleSwitcher ─────────────────────────────────────────────────────────
-function DemoRoleSwitcher() {
-  const { isAdmin, switchRole } = useAuth();
-  if (import.meta.env.VITE_DEMO_MODE !== 'true') return null;
+// ─── AuthProvider ─────────────────────────────────────────────────────────────
 
-  const handleSwitch = (role: UserRole) => {
-    localStorage.setItem('silaisikho-demo-role', role);
-    switchRole(role);
-    window.location.href = role === 'admin' ? '/admin' : '/dashboard';
-  };
-
-  return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-1">
-      <span className="text-warm-text text-xs mb-1">Demo Mode</span>
-      <div className="bg-white rounded-full shadow-card px-1 py-1 flex gap-1">
-        <button
-          onClick={() => handleSwitch('student')}
-          className={`h-8 px-3 rounded-full text-xs font-medium cursor-pointer transition-colors ${
-            !isAdmin ? 'bg-brand text-white' : 'bg-muted text-warm-text hover:bg-warm-border'
-          }`}
-        >
-          Student View — छात्र
-        </button>
-        <button
-          onClick={() => handleSwitch('admin')}
-          className={`h-8 px-3 rounded-full text-xs font-medium cursor-pointer transition-colors ${
-            isAdmin ? 'bg-brand text-white' : 'bg-muted text-warm-text hover:bg-warm-border'
-          }`}
-        >
-          Admin View — एडमिन
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Provider ─────────────────────────────────────────────────────────────────
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<IUser | null>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [token, setToken] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState<BackendUser | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const login = (user: IUser, tok: string) => {
-    setCurrentUser(user);
-    setIsLoggedIn(true);
-    setIsAdmin(user.role === 'admin');
-    setToken(tok);
-  };
+  // Derived values
+  const isLoggedIn = currentUser !== null && accessToken !== null;
+  const isAdmin = currentUser?.role === 'admin';
 
-  const logout = () => {
-    setCurrentUser(null);
-    setIsLoggedIn(false);
-    setIsAdmin(false);
-    setToken(null);
-  };
+  // ─── Startup Effect ───────────────────────────────────────────────────────
+  // Restore session from httpOnly cookie on mount
 
-  const switchRole = (role: UserRole) => {
-    if (role === 'admin') {
-      setCurrentUser(MOCK_ADMIN);
-      setIsLoggedIn(true);
-      setIsAdmin(true);
-      setToken('mock-admin-token');
-    } else {
-      setCurrentUser(MOCK_STUDENTS[0]);
-      setIsLoggedIn(true);
-      setIsAdmin(false);
-      setToken('mock-student-token');
-    }
-  };
-
-  // Restore role from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem('silaisikho-demo-role') as UserRole | null;
-    if (saved === 'admin') {
-      switchRole('admin');
-    } else {
-      switchRole('student');
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const restoreSession = async () => {
+      try {
+        // Call refresh endpoint to get a new access token from the httpOnly cookie
+        const refreshResponse = await refreshTokens();
+
+        if (refreshResponse.success && refreshResponse.data) {
+          const newToken = refreshResponse.data.accessToken;
+          tokenStore.setToken(newToken);
+          setAccessToken(newToken);
+
+          // Fetch the current user profile
+          const profileResponse = await getMyProfile();
+          if (profileResponse.success && profileResponse.data) {
+            setCurrentUser(profileResponse.data);
+          }
+        }
+      } catch (error) {
+        // No valid session — user is not logged in
+        // This is not an error, just means no cookie exists
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    restoreSession();
   }, []);
 
-  const value: AuthContextType = { currentUser, isLoggedIn, isAdmin, token, login, logout, switchRole };
+  // ─── Login Function ───────────────────────────────────────────────────────
+  // Supports both:
+  // 1. Real API: login(identifier: string, pin: string) - calls backend
+  // 2. Mock: login(user: IUser, token: string) - for backward compatibility with pages
+
+  const login = useCallback(async (identifierOrUser: string | any, pinOrToken?: string) => {
+    // Check if this is the mock signature: login(user, token)
+    if (typeof identifierOrUser === 'object' && identifierOrUser !== null && typeof pinOrToken === 'string') {
+      // Mock signature - used by pages during demo
+      const user = identifierOrUser;
+      const token = pinOrToken;
+      tokenStore.setToken(token);
+      setAccessToken(token);
+      // Convert IUser to BackendUser
+      const backendUser: BackendUser = {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        mobileNumber: user.mobileNumber,
+        profilePicUrl: user.profilePicUrl,
+        role: user.role,
+        authProvider: 'local',
+      };
+      setCurrentUser(backendUser);
+      return;
+    }
+
+    // Real API signature: login(identifier: string, pin: string)
+    const identifier = identifierOrUser as string;
+    const pin = pinOrToken as string;
+    const response = await loginUser({ identifier, pin });
+
+    if (!response.success) {
+      throw new Error(response.message);
+    }
+
+    if (!response.data) {
+      throw new Error('No data in login response');
+    }
+
+    const { accessToken: newToken, user } = response.data;
+    tokenStore.setToken(newToken);
+    setAccessToken(newToken);
+    setCurrentUser(user);
+  }, []);
+
+  // ─── Register Function ────────────────────────────────────────────────────
+
+  const register = useCallback(async (name: string, identifier: string, pin: string) => {
+    const response = await registerUser({ name, identifier, pin });
+
+    if (!response.success) {
+      throw new Error(response.message);
+    }
+
+    if (!response.data) {
+      throw new Error('No data in register response');
+    }
+
+    const { accessToken: newToken, user } = response.data;
+    tokenStore.setToken(newToken);
+    setAccessToken(newToken);
+    setCurrentUser(user);
+  }, []);
+
+  // ─── Logout Function ──────────────────────────────────────────────────────
+
+  const logout = useCallback(async () => {
+    try {
+      await logoutUser();
+    } finally {
+      // Always clear state even if logout call fails
+      tokenStore.setToken(null);
+      setCurrentUser(null);
+      setAccessToken(null);
+      navigate('/login');
+    }
+  }, [navigate]);
+
+  // ─── Update Current User ──────────────────────────────────────────────────
+
+  const updateCurrentUser = useCallback((updates: Partial<BackendUser>) => {
+    setCurrentUser((prev) => (prev ? { ...prev, ...updates } : null));
+  }, []);
+
+  // ─── Loading Screen ───────────────────────────────────────────────────────
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-white">
+        <Spinner size="lg" colour="brand" />
+      </div>
+    );
+  }
+
+  // ─── Provider ─────────────────────────────────────────────────────────────
+
+  const value: AuthContextType = {
+    currentUser,
+    accessToken,
+    token: accessToken, // Alias for backward compatibility
+    isLoggedIn,
+    isAdmin,
+    isLoading,
+    login,
+    register,
+    logout,
+    updateCurrentUser,
+  };
 
   return (
     <AuthContext.Provider value={value}>
@@ -109,9 +186,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
+// ─── useAuth Hook ─────────────────────────────────────────────────────────────
+
 export function useAuth(): AuthContextType {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
   return ctx;
 }

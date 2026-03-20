@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { User, Phone, MapPin, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { Button, BilingualLabel, Spinner } from '@/components/ui';
+import { Button, BilingualLabel } from '@/components/ui';
 import { Navbar } from '@/components/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
