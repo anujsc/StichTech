@@ -61,6 +61,7 @@ export function isAdmin(req: Request, res: Response, next: NextFunction): void {
 // ─── verifyCurrentPin ─────────────────────────────────────────────────────────
 // Confirms the submitted currentPin matches the stored hash before allowing
 // a PIN change. Runs after isAuthenticated — req.user is guaranteed to exist.
+// NOTE: isAuthenticated excludes passwordHash, so we must re-fetch the user here.
 
 export async function verifyCurrentPin(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -75,7 +76,14 @@ export async function verifyCurrentPin(req: Request, res: Response, next: NextFu
       return;
     }
 
-    const isMatch = await (req.user as IUserDocument).comparePin(currentPin);
+    // Re-fetch user WITH passwordHash (isAuthenticated excluded it)
+    const userWithHash = await User.findById((req.user as IUserDocument)._id).select('+passwordHash');
+    if (!userWithHash) {
+      res.status(401).json({ success: false, message: 'User not found — यूजर नहीं मिला' });
+      return;
+    }
+
+    const isMatch = await userWithHash.comparePin(currentPin);
     if (!isMatch) {
       res.status(401).json({ success: false, message: 'Current PIN is incorrect — मौजूदा PIN गलत है' });
       return;

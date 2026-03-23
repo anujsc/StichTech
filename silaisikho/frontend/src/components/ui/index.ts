@@ -21,3 +21,9 @@ export type { EmptyStateProps } from './EmptyState';
 
 export { Spinner } from './Spinner';
 export type { SpinnerProps } from './Spinner';
+
+export { IdentifierInput } from './IdentifierInput';
+export type { IdentifierInputProps } from './IdentifierInput';
+
+export { PinInput } from './PinInput';
+export type { PinInputProps } from './PinInput';

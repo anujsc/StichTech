@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Spinner } from '@/components/ui';
 
@@ -21,7 +20,6 @@ const DEMO_ADMIN_CREDENTIALS = {
 
 export function DemoRoleSwitcher() {
   const { login, isAdmin } = useAuth();
-  const navigate = useNavigate();
   const [isSwitching, setIsSwitching] = useState(false);
 
   if (import.meta.env.VITE_DEMO_MODE !== 'true') {
@@ -33,7 +31,8 @@ export function DemoRoleSwitcher() {
     try {
       const credentials = role === 'admin' ? DEMO_ADMIN_CREDENTIALS : DEMO_STUDENT_CREDENTIALS;
       await login(credentials.identifier, credentials.pin);
-      navigate(role === 'admin' ? '/admin' : '/dashboard');
+      // Use window.location instead of useNavigate (outside Router context)
+      window.location.href = role === 'admin' ? '/admin' : '/dashboard';
     } catch (error) {
       console.error('Demo role switch failed:', error);
     } finally {

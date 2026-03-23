@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode, Fragment } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { BackendUser } from '@/types/api';
 import { tokenStore } from '@/api/axiosInstance';
 import { loginUser, logoutUser, refreshTokens, registerUser, getMyProfile } from '@/api/authApi';
@@ -26,7 +25,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // ─── AuthProvider ─────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<BackendUser | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,12 +35,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ─── Startup Effect ───────────────────────────────────────────────────────
   // Restore session from httpOnly cookie on mount
+  // Use a ref to prevent duplicate calls in React StrictMode
 
   useEffect(() => {
+    let isMounted = true;
+
     const restoreSession = async () => {
       try {
         // Call refresh endpoint to get a new access token from the httpOnly cookie
         const refreshResponse = await refreshTokens();
+
+        if (!isMounted) return;
 
         if (refreshResponse.success && refreshResponse.data) {
           const newToken = refreshResponse.data.accessToken;
@@ -51,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           // Fetch the current user profile
           const profileResponse = await getMyProfile();
-          if (profileResponse.success && profileResponse.data) {
+          if (isMounted && profileResponse.success && profileResponse.data) {
             setCurrentUser(profileResponse.data);
           }
         }
@@ -59,11 +62,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // No valid session — user is not logged in
         // This is not an error, just means no cookie exists
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     restoreSession();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // ─── Login Function ───────────────────────────────────────────────────────
@@ -141,9 +150,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tokenStore.setToken(null);
       setCurrentUser(null);
       setAccessToken(null);
-      navigate('/login');
+      // Redirect to login using window.location instead of useNavigate
+      // because AuthProvider is outside Router context
+      window.location.href = '/login';
     }
-  }, [navigate]);
+  }, []);
 
   // ─── Update Current User ──────────────────────────────────────────────────
 

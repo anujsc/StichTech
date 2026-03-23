@@ -51,6 +51,11 @@ axiosInstance.interceptors.response.use(
   async (error: any) => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 
+    // Don't retry if this is the refresh endpoint itself (prevent infinite loop)
+    if (originalRequest.url?.includes('/auth/refresh')) {
+      return Promise.reject(error);
+    }
+
     // Check if this is a 401 that should trigger a refresh
     const should401Refresh =
       error.response &&

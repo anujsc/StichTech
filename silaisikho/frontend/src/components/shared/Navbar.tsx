@@ -55,7 +55,10 @@ function UserMenu({ isWhiteBg }: { isWhiteBg: boolean }) {
     navigate('/');
   };
 
+  // Early return AFTER hooks to comply with Rules of Hooks
   if (!currentUser) return null;
+
+  const firstName = currentUser.name?.split(' ')[0] || currentUser.name || 'User';
 
   return (
     <div ref={ref} className="relative">
@@ -69,9 +72,9 @@ function UserMenu({ isWhiteBg }: { isWhiteBg: boolean }) {
         aria-label="User menu"
         aria-expanded={open}
       >
-        <Avatar name={currentUser.name} size="sm" />
+        <Avatar name={currentUser.name || 'User'} size="sm" />
         <span className={clsx('text-sm font-medium hidden lg:block max-w-[100px] truncate', isWhiteBg ? 'text-navy' : 'text-white')}>
-          {currentUser.name.split(' ')[0]}
+          {firstName}
         </span>
         <ChevronDown size={14} className={clsx('transition-transform', open && 'rotate-180', isWhiteBg ? 'text-warm-text' : 'text-white/70')} />
       </button>
@@ -80,10 +83,10 @@ function UserMenu({ isWhiteBg }: { isWhiteBg: boolean }) {
         <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-2xl shadow-card border border-warm-border overflow-hidden z-50">
           {/* User info header */}
           <div className="px-4 py-3 border-b border-warm-border">
-            <p className="text-navy text-sm font-semibold truncate">{currentUser.name}</p>
-            <p className="text-warm-text text-xs truncate">{currentUser.email}</p>
+            <p className="text-navy text-sm font-semibold truncate">{currentUser.name || 'User'}</p>
+            <p className="text-warm-text text-xs truncate">{currentUser.email || currentUser.mobileNumber || ''}</p>
             <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-brand/10 text-brand capitalize">
-              {currentUser.role}
+              {currentUser.role || 'user'}
             </span>
           </div>
 

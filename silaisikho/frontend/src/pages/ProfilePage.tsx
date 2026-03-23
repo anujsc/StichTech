@@ -1,202 +1,271 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { User, Phone, MapPin, CheckCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useLocation, Link } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Mail, Phone, Lock, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { Button, BilingualLabel } from '@/components/ui';
+import { useProfile } from '@/hooks/useProfile';
 import { Navbar } from '@/components/shared';
+import { Button, Avatar, BilingualLabel, Spinner } from '@/components/ui';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface ProfileFormValues {
-  name: string;
-  phone: string;
-  city: string;
-}
+// ─── Schema ───────────────────────────────────────────────────────────────────
 
-interface FieldError {
-  name?: string;
-  phone?: string;
-}
+const UpdateProfileSchema = z.object({
+  name: z.string().trim().min(2, 'Name must be at least 2 characters — नाम कम से कम 2 अक्षर का होना चाहिए').max(100).optional(),
+  profilePicUrl: z.union([
+    z.string().trim().url('Please enter a valid image URL — सही image URL डालें'),
+    z.literal(''),
+  ]).optional(),
+}).refine(
+  (data) => {
+    const hasName = data.name && data.name.length > 0;
+    const hasUrl = data.profilePicUrl && data.profilePicUrl.length > 0;
+    return hasName || hasUrl;
+  },
+  {
+    message: 'Please update at least one field — कम से कम एक field बदलें',
+    path: ['name'],
+  }
+);
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-const inputCls = [
-  'w-full min-h-[52px] pl-11 pr-4 rounded-xl border border-warm-border',
-  'text-navy text-base placeholder:text-warm-text/50',
-  'focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors',
-].join(' ');
+type UpdateProfileFormValues = z.infer<typeof UpdateProfileSchema>;
 
-function validate(vals: ProfileFormValues): FieldError {
-  const errs: FieldError = {};
-  if (!vals.name.trim() || vals.name.trim().length < 2) errs.name = 'Name must be at least 2 characters — नाम कम से कम 2 अक्षर का होना चाहिए';
-  if (vals.phone && !/^[6-9]\d{9}$/.test(vals.phone.replace(/\s/g, ''))) errs.phone = 'Enter a valid 10-digit Indian mobile number';
-  return errs;
-}
+// ─── ProfilePage ──────────────────────────────────────────────────────────────
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function ProfilePage() {
-  const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, login, token } = useAuth();
+  const { currentUser, isLoading } = useAuth();
+  const { isUpdating, updateError, updateSuccess, updateProfile } = useProfile();
+  const [localError, setLocalError] = useState('');
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState(false);
 
-  // isSetup = true when coming from login for the first time (name is placeholder)
-  const isSetup = !currentUser?.name || currentUser.name === 'New User';
-
-  const [values, setValues] = useState<ProfileFormValues>({
-    name: isSetup ? '' : (currentUser?.name ?? ''),
-    phone: '',
-    city: '',
+  const { register, handleSubmit, formState: { errors }, reset, watch } = useForm<UpdateProfileFormValues>({
+    resolver: zodResolver(UpdateProfileSchema),
+    defaultValues: {
+      name: currentUser?.name || '',
+      profilePicUrl: currentUser?.profilePicUrl || '',
+    },
   });
-  const [errors, setErrors] = useState<FieldError>({});
-  const [saving, setSaving] = useState<boolean>(false);
-  const [saved, setSaved] = useState<boolean>(false);
 
-  // If not logged in, redirect to login
+  // Watch profilePicUrl for preview
+  const profilePicUrl = watch('profilePicUrl');
+
+  // Update preview when URL changes
   useEffect(() => {
-    if (!currentUser) navigate('/login', { replace: true });
-  }, [currentUser, navigate]);
+    if (profilePicUrl && profilePicUrl.length > 0) {
+      setPreviewUrl(profilePicUrl);
+      setPreviewError(false);
+    } else {
+      setPreviewUrl(null);
+      setPreviewError(false);
+    }
+  }, [profilePicUrl]);
 
-  const handleChange = useCallback((field: keyof ProfileFormValues, value: string) => {
-    setValues((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => ({ ...prev, [field]: undefined }));
-  }, []);
+  // Reset form when currentUser loads or changes
+  useEffect(() => {
+    if (currentUser) {
+      reset({
+        name: currentUser.name || '',
+        profilePicUrl: currentUser.profilePicUrl || '',
+      });
+    }
+  }, [currentUser, reset]);
 
-  const handleSave = useCallback(() => {
-    const errs = validate(values);
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+  const onSubmit = async (values: UpdateProfileFormValues) => {
+    setLocalError('');
 
-    setSaving(true);
-    setTimeout(() => {
-      // Update the user in auth context with the new name
-      if (currentUser && token) {
-        login({ ...currentUser, name: values.name.trim() }, token);
-      }
-      setSaving(false);
-      setSaved(true);
-      setTimeout(() => {
-        // After setup, go to dashboard; after edit, stay on profile
-        const from = (location.state as { from?: string })?.from;
-        navigate(from ?? (currentUser?.role === 'admin' ? '/admin' : '/dashboard'));
-      }, 1200);
-    }, 900);
-  }, [values, currentUser, token, login, navigate, location.state]);
+    // Build params with only changed fields
+    const params: { name?: string; profilePicUrl?: string } = {};
 
-  if (!currentUser) return null;
+    if (values.name && values.name !== currentUser?.name) {
+      params.name = values.name;
+    }
+
+    if (values.profilePicUrl !== undefined && values.profilePicUrl !== currentUser?.profilePicUrl) {
+      params.profilePicUrl = values.profilePicUrl;
+    }
+
+    // Check if anything actually changed
+    if (Object.keys(params).length === 0) {
+      setLocalError('No changes detected — कोई बदलाव नहीं');
+      return;
+    }
+
+    await updateProfile(params);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-white">
+        <Spinner size="lg" colour="brand" />
+      </div>
+    );
+  }
 
   return (
-    <div className="page-enter min-h-screen bg-surface flex flex-col">
+    <div className="page-enter min-h-screen bg-surface">
       <Navbar transparent={false} currentPath={location.pathname} />
 
-      <div className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-md bg-card rounded-2xl shadow-card p-8">
+      <div className="max-w-2xl mx-auto px-4 py-8">
 
-          {/* Header */}
-          <div className="text-center mb-8">
-            <BilingualLabel
-              english={isSetup ? 'Complete Your Profile' : 'My Profile'}
-              hindi={isSetup ? 'अपनी प्रोफाइल पूरी करें' : 'मेरी प्रोफाइल'}
-              englishSize="xl"
-              englishWeight="bold"
-              hindiSize="sm"
-              gap="tight"
-              className="justify-center"
+        {/* Profile Header Card */}
+        <div className="bg-card rounded-2xl shadow-card p-6 mb-6 flex flex-col md:flex-row items-center gap-6">
+          <div className="flex flex-col items-center gap-2">
+            <Avatar
+              name={currentUser?.name || 'User'}
+              imageUrl={currentUser?.profilePicUrl}
+              size="xl"
             />
-            {isSetup && (
-              <p className="text-warm-text text-sm mt-2">
-                Just a few details to get you started — शुरू करने के लिए कुछ जानकारी दें
-              </p>
-            )}
+            <span className="text-warm-text text-xs">Profile photo</span>
           </div>
 
-          {/* Email (read-only) */}
-          <div className="mb-5">
-            <label className="block text-navy text-sm font-medium mb-1.5">
-              Email — ईमेल
-            </label>
-            <div className="w-full min-h-[52px] px-4 rounded-xl border border-warm-border bg-muted flex items-center text-warm-text text-sm">
-              {currentUser.email}
+          <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left">
+            <h1 className="text-navy text-xl font-semibold mb-2">{currentUser?.name || 'User'}</h1>
+            <div className="flex items-center gap-2 text-warm-text text-sm mb-2">
+              {currentUser?.email ? (
+                <>
+                  <Mail size={16} />
+                  <span>{currentUser.email}</span>
+                </>
+              ) : currentUser?.mobileNumber ? (
+                <>
+                  <Phone size={16} />
+                  <span>{currentUser.mobileNumber}</span>
+                </>
+              ) : null}
             </div>
-          </div>
-
-          {/* Name */}
-          <div className="mb-5">
-            <label className="block text-navy text-sm font-medium mb-1.5">
-              Full Name — पूरा नाम <span className="text-brand">*</span>
-            </label>
-            <div className="relative">
-              <User size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-warm-text pointer-events-none" />
-              <input
-                type="text"
-                value={values.name}
-                onChange={(e) => handleChange('name', e.target.value)}
-                placeholder="e.g. Sunita Devi"
-                className={inputCls}
-                autoFocus={isSetup}
-              />
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-brand/10 text-brand capitalize mb-3">
+              {currentUser?.role === 'admin' ? 'Admin — एडमिन' : 'Student — छात्र'}
             </div>
-            {errors.name && <p className="text-brand text-xs mt-1">{errors.name}</p>}
-          </div>
-
-          {/* Phone */}
-          <div className="mb-5">
-            <label className="block text-navy text-sm font-medium mb-1.5">
-              Mobile Number — मोबाइल नंबर
-              <span className="text-warm-text font-normal ml-1">(optional)</span>
-            </label>
-            <div className="relative">
-              <Phone size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-warm-text pointer-events-none" />
-              <input
-                type="tel"
-                value={values.phone}
-                onChange={(e) => handleChange('phone', e.target.value)}
-                placeholder="98765 43210"
-                maxLength={10}
-                className={inputCls}
-              />
-            </div>
-            {errors.phone && <p className="text-brand text-xs mt-1">{errors.phone}</p>}
-          </div>
-
-          {/* City */}
-          <div className="mb-8">
-            <label className="block text-navy text-sm font-medium mb-1.5">
-              City — शहर
-              <span className="text-warm-text font-normal ml-1">(optional)</span>
-            </label>
-            <div className="relative">
-              <MapPin size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-warm-text pointer-events-none" />
-              <input
-                type="text"
-                value={values.city}
-                onChange={(e) => handleChange('city', e.target.value)}
-                placeholder="e.g. Indore, Jaipur…"
-                className={inputCls}
-              />
-            </div>
-          </div>
-
-          {/* Save button */}
-          {saved ? (
-            <div className="flex items-center justify-center gap-2 min-h-[52px] bg-green-50 rounded-xl border border-green-200">
-              <CheckCircle size={20} className="text-green-500" />
-              <span className="text-green-700 text-sm font-medium">
-                {isSetup ? 'Profile saved! Redirecting…' : 'Changes saved — बदलाव सेव हो गए'}
-              </span>
-            </div>
-          ) : (
-            <Button variant="primary" size="lg" fullWidth loading={saving} onClick={handleSave}>
-              {isSetup ? 'Save & Continue — सेव करें' : 'Save Changes — बदलाव सेव करें'}
-            </Button>
-          )}
-
-          {/* Skip for now (only on setup) */}
-          {isSetup && !saved && (
-            <button
-              type="button"
-              onClick={() => navigate(currentUser.role === 'admin' ? '/admin' : '/dashboard')}
-              className="w-full mt-3 text-warm-text text-sm hover:text-navy transition-colors min-h-[44px]"
+            <Link
+              to="/change-pin"
+              className="flex items-center gap-1.5 text-brand text-sm hover:underline"
             >
-              Skip for now — अभी छोड़ें
-            </button>
-          )}
+              <Lock size={14} />
+              Change PIN — PIN बदलें
+            </Link>
+          </div>
+        </div>
+
+        {/* Update Form Card */}
+        <div className="bg-card rounded-2xl shadow-card p-6">
+          <BilingualLabel
+            english="Edit Profile"
+            hindi="प्रोफ़ाइल बदलें"
+            englishSize="xl"
+            englishWeight="bold"
+            hindiSize="sm"
+            gap="tight"
+            className="mb-6"
+          />
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+
+            {/* Name Field */}
+            <div>
+              <label className="block text-navy text-sm font-medium mb-1.5">
+                <BilingualLabel
+                  english="Your Name"
+                  hindi="आपका नाम"
+                  englishSize="sm"
+                  hindiSize="xs"
+                  gap="tight"
+                />
+              </label>
+              <input
+                type="text"
+                {...register('name')}
+                className="w-full min-h-[52px] px-4 rounded-xl border border-warm-border text-navy text-base placeholder:text-warm-text/50 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors"
+                placeholder="Enter your full name"
+              />
+              {errors.name && (
+                <p className="text-brand text-xs mt-1">{errors.name.message}</p>
+              )}
+            </div>
+
+            {/* Profile Picture URL Field */}
+            <div>
+              <label className="block text-navy text-sm font-medium mb-1.5">
+                <BilingualLabel
+                  english="Profile Picture URL"
+                  hindi="प्रोफ़ाइल फ़ोटो URL"
+                  englishSize="sm"
+                  hindiSize="xs"
+                  gap="tight"
+                />
+              </label>
+              <p className="text-warm-text text-xs mb-2">
+                Enter a direct link to your photo — अपनी फ़ोटो का link डालें
+              </p>
+              <input
+                type="url"
+                {...register('profilePicUrl')}
+                className="w-full min-h-[52px] px-4 rounded-xl border border-warm-border text-navy text-base placeholder:text-warm-text/50 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors"
+                placeholder="https://example.com/photo.jpg"
+              />
+              {errors.profilePicUrl && (
+                <p className="text-brand text-xs mt-1">{errors.profilePicUrl.message}</p>
+              )}
+
+              {/* Preview */}
+              {previewUrl && !previewError && (
+                <div className="mt-3">
+                  <p className="text-warm-text text-xs mb-2">Preview:</p>
+                  <img
+                    src={previewUrl}
+                    alt="Profile preview"
+                    className="w-12 h-12 rounded-full object-cover"
+                    onError={() => setPreviewError(true)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Local Error */}
+            {localError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                <p className="text-red-700 text-sm">{localError}</p>
+              </div>
+            )}
+
+            {/* Server Error */}
+            {updateError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                <p className="text-red-700 text-sm">{updateError}</p>
+              </div>
+            )}
+
+            {/* Success Notification */}
+            {updateSuccess && (
+              <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2">
+                <CheckCircle size={18} className="text-green-600" />
+                <p className="text-green-700 text-sm">
+                  Profile updated successfully — प्रोफ़ाइल अपडेट हो गई
+                </p>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={isUpdating}
+              disabled={isUpdating}
+            >
+              <BilingualLabel
+                english="Update Profile"
+                hindi="प्रोफ़ाइल अपडेट करें"
+                englishSize="sm"
+                hindiSize="xs"
+                gap="tight"
+                className="text-white"
+              />
+            </Button>
+          </form>
         </div>
       </div>
     </div>
