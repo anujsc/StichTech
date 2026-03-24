@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import z from 'zod';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/components/shared/ToastProvider';
 import { IdentifierInput, PinInput, Button, Spinner } from '@/components/ui';
 import { Navbar } from '@/components/shared';
 
@@ -57,6 +58,7 @@ type RegisterFormValues = z.infer<typeof RegisterSchema>;
 
 export default function RegisterPage() {
   const { register, isLoggedIn, isLoading } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -113,6 +115,7 @@ export default function RegisterPage() {
     try {
       // Only pass name, identifier, and pin to the backend
       await register(data.name, data.identifier, data.pin);
+      showToast('Account created successfully! — अकाउंट बन गया', 'success');
       setRegistrationSuccess(true);
 
       // Redirect after 1.5 seconds
@@ -122,6 +125,7 @@ export default function RegisterPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Registration failed';
       setServerError(message);
+      showToast(message, 'error');
     }
   };
 

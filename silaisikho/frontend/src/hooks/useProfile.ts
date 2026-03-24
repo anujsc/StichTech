@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/components/shared/ToastProvider';
 import { getMyProfile, updateMyProfile } from '@/api/authApi';
 import type { BackendUser } from '@/types/api';
+import { extractErrorMessage } from '@/utils/apiError';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +16,7 @@ export interface UpdateProfileParams {
 
 export function useProfile() {
   const { currentUser, updateCurrentUser } = useAuth();
+  const { showToast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState('');
   const [updateSuccess, setUpdateSuccess] = useState(false);
@@ -25,7 +28,7 @@ export function useProfile() {
     try {
       const response = await getMyProfile();
       if (response.success && response.data) {
-        updateCurrentUser(response.data as Partial<BackendUser>);
+        updateCurrentUser(response.data.user as Partial<BackendUser>);
       }
     } catch (error) {
       // Silent failure - don't surface errors for background refresh
@@ -48,7 +51,7 @@ export function useProfile() {
       }
 
       if (response.data) {
-        updateCurrentUser(response.data as Partial<BackendUser>);
+        updateCurrentUser(response.data.user as Partial<BackendUser>);
       }
 
       setUpdateSuccess(true);
@@ -57,12 +60,16 @@ export function useProfile() {
       setTimeout(() => {
         setUpdateSuccess(false);
       }, 3000);
+      
+      showToast('Profile updated successfully! — प्रोफ़ाइल अपडेट हो गई', 'success');
     } catch (error: any) {
-      setUpdateError(error.message || 'An error occurred while updating your profile');
+      const errorMsg = extractErrorMessage(error);
+      setUpdateError(errorMsg);
+      showToast(errorMsg, 'error');
     } finally {
       setIsUpdating(false);
     }
-  }, [updateCurrentUser]);
+  }, [updateCurrentUser, showToast]);
 
   return {
     currentUser,

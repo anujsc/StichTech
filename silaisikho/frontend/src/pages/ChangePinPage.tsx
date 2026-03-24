@@ -5,10 +5,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ShieldAlert, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/components/shared/ToastProvider';
 import { changeMyPin } from '@/api/authApi';
 import { tokenStore } from '@/api/axiosInstance';
 import { Navbar } from '@/components/shared';
 import { Button, PinInput, BilingualLabel, Spinner } from '@/components/ui';
+import { extractErrorMessage } from '@/utils/apiError';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -44,6 +46,7 @@ export default function ChangePinPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { updateCurrentUser } = useAuth();
+  const { showToast } = useToast();
   const [serverError, setServerError] = useState('');
   const [pinChangeSuccess, setPinChangeSuccess] = useState(false);
 
@@ -80,13 +83,16 @@ export default function ChangePinPage() {
 
       // Show success screen
       setPinChangeSuccess(true);
+      showToast('PIN changed successfully! — PIN बदल गया', 'success');
 
       // Redirect to profile after 2 seconds
       setTimeout(() => {
         navigate('/profile', { replace: true });
       }, 2000);
     } catch (error: any) {
-      setServerError(error.message || 'An error occurred while changing your PIN');
+      const errorMsg = extractErrorMessage(error);
+      setServerError(errorMsg);
+      showToast(errorMsg, 'error');
     }
   };
 

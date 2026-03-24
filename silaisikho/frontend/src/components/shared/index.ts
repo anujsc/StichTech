@@ -20,3 +20,13 @@ export { ToastProvider, useToast } from './ToastProvider';
 export type { Toast, ToastContextType, ToastVariant } from './ToastProvider';
 
 export { DemoRoleSwitcher } from './DemoRoleSwitcher';
+
+export { AuthErrorBoundary } from './AuthErrorBoundary';
+
+export { SessionExpiredToast } from './SessionExpiredToast';
+
+export { ErrorBoundary } from './ErrorBoundary';
+
+export { RouteGuard } from './RouteGuard';
+
+export { RouteSuspense } from './RouteSuspense';

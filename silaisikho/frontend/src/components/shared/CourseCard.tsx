@@ -1,8 +1,10 @@
+import { memo } from 'react';
 import { PlayCircle, Clock } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Badge, Button, PriceDisplay, ProgressBar } from '@/components/ui';
 import type { ICourse, CourseLevel } from '@/types';
 import { ThumbnailGradientMap } from '@/types';
+import { formatDuration } from '@/utils/format';
 
 export interface CourseCardProps {
   course: ICourse;
@@ -11,25 +13,18 @@ export interface CourseCardProps {
   onClick?: () => void;
 }
 
-function formatDuration(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
 const levelVariantMap: Record<CourseLevel, 'level-beginner' | 'level-intermediate' | 'level-advanced'> = {
   beginner:     'level-beginner',
   intermediate: 'level-intermediate',
   advanced:     'level-advanced',
 };
 
-export function CourseCard({
+const CourseCardComponent = ({
   course,
   variant,
   progressPercentage = 0,
   onClick,
-}: CourseCardProps) {
+}: CourseCardProps) => {
   const gradientClass = ThumbnailGradientMap[course.thumbnailColour];
   const duration = formatDuration(course.totalDurationSeconds);
 
@@ -121,6 +116,8 @@ export function CourseCard({
       </div>
     </div>
   );
-}
+};
 
+// Memoize to prevent unnecessary re-renders in lists
+export const CourseCard = memo(CourseCardComponent);
 export default CourseCard;

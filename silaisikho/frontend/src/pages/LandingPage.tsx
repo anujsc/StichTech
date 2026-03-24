@@ -348,7 +348,7 @@ export default function LandingPage() {
   void EmptyState; void fmtDur;
   return (
     <div className="page-enter">
-      <Navbar transparent currentPath={location.pathname} />
+      <Navbar transparent={false} currentPath={location.pathname} />
       <HeroSection />
       <StatsStrip />
       <FeaturedCoursesSection />

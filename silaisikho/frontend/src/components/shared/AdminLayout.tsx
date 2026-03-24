@@ -1,13 +1,13 @@
 import { useState, ReactNode } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Video, Upload, Users,
   Menu, LogOut, X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { Avatar, BilingualLabel } from '@/components/ui';
-import { MOCK_ADMIN } from '@/mockData';
+import { Avatar, BilingualLabel, Spinner } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
+import { useLogout } from '@/hooks/useLogout';
 
 export interface AdminLayoutProps {
   pageTitle: string;
@@ -30,13 +30,8 @@ const NAV_ITEMS: SideNavItem[] = [
 ];
 
 function SidebarContent({ onClose }: { onClose?: () => void }) {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  const { currentUser } = useAuth();
+  const { handleLogout, isLoggingOut } = useLogout();
   return (
     <div className="flex flex-col h-full bg-navy">
       {/* Logo */}
@@ -97,15 +92,28 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
       {/* Admin profile pinned at bottom */}
       <div className="mt-auto border-t border-warm-border/20 mx-4 pt-4 pb-5 px-1">
         <div className="flex items-center gap-3 mb-3">
-          <Avatar name={MOCK_ADMIN.name} size="sm" />
+          <Avatar name={currentUser?.name || 'Admin'} imageUrl={currentUser?.profilePicUrl} size="sm" />
           <div className="flex flex-col leading-none">
-            <span className="text-white text-[13px] font-medium">{MOCK_ADMIN.name}</span>
-            <span className="text-gold text-[11px] mt-0.5 capitalize">{MOCK_ADMIN.role}</span>
+            <span className="text-white text-[13px] font-medium">{currentUser?.name || 'Admin'}</span>
+            <span className="text-gold text-[11px] mt-0.5 capitalize">{currentUser?.role || 'admin'}</span>
           </div>
         </div>
-        <button onClick={handleLogout} className="flex items-center gap-2 text-warm-text text-[12px] hover:text-white transition-colors duration-150 min-h-[36px]">
-          <LogOut size={14} />
-          <span>Logout</span>
+        <button
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className="flex items-center gap-2 text-warm-text text-[12px] hover:text-white transition-colors duration-150 min-h-[36px] disabled:opacity-50"
+        >
+          {isLoggingOut ? (
+            <>
+              <Spinner size="sm" colour="white" />
+              <span>Logging out...</span>
+            </>
+          ) : (
+            <>
+              <LogOut size={14} />
+              <span>Logout — लॉगआउट</span>
+            </>
+          )}
         </button>
       </div>
     </div>

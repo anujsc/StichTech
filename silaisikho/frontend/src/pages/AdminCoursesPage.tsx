@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { Plus, Search, Pencil, Trash2, Users, BookX } from 'lucide-react';
 import { clsx } from 'clsx';
 import { AdminLayout, ConfirmDialog, FormDrawer, useToast } from '@/components/shared';
@@ -10,20 +9,8 @@ import { Button, Badge, BilingualLabel, EmptyState } from '@/components/ui';
 import { MOCK_COURSES, MOCK_ENROLLMENTS } from '@/mockData';
 import { ThumbnailGradientMap } from '@/types';
 import type { ICourse, ThumbnailColour, CourseLanguage, CourseLevel } from '@/types';
-
-// ─── Zod schema ───────────────────────────────────────────────────────────────
-const courseSchema = z.object({
-  title: z.string().min(5, 'Title must be at least 5 characters — शीर्षक कम से कम 5 अक्षर का होना चाहिए'),
-  description: z.string().min(50, 'Description must be at least 50 characters'),
-  price: z.number({ invalid_type_error: 'Price is required' }).min(99).max(9999),
-  language: z.enum(['Hindi', 'English', 'Mixed'] as [CourseLanguage, ...CourseLanguage[]]),
-  level: z.enum(['beginner', 'intermediate', 'advanced'] as [CourseLevel, ...CourseLevel[]]),
-  thumbnailColour: z.enum(['rose', 'amber', 'terracotta', 'marigold', 'burgundy', 'saffron'] as [ThumbnailColour, ...ThumbnailColour[]]),
-});
-type CourseFormValues = z.infer<typeof courseSchema>;
-
-const THUMB_COLOURS: ThumbnailColour[] = ['rose', 'amber', 'terracotta', 'marigold', 'burgundy', 'saffron'];
-const LEVELS: CourseLevel[] = ['beginner', 'intermediate', 'advanced'];
+import { courseSchema, type CourseFormValues, THUMB_COLOURS, LEVELS, inputCls, errCls } from '@/schemas/course.schema';
+import { formatDuration } from '@/utils/format';
 
 // ─── Create Course Form ───────────────────────────────────────────────────────
 interface CreateCourseFormProps {
@@ -60,9 +47,6 @@ function CreateCourseForm({ onSave, onClose }: CreateCourseFormProps) {
 
   const onDraft = handleSubmit((data) => { onSave(buildCourse(data, 'draft')); onClose(); });
   const onPublish = handleSubmit((data) => { onSave(buildCourse(data, 'published')); onClose(); });
-
-  const inputCls = 'w-full rounded-xl border border-warm-border px-4 py-3 text-base text-navy focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors';
-  const errCls = 'text-brand text-sm mt-1';
 
   return (
     <div className="flex flex-col gap-5">
@@ -201,7 +185,7 @@ export default function AdminCoursesPage() {
     setDeletingCourseId('');
   }, [deletingCourseId]);
 
-  const inputCls = 'rounded-full border border-warm-border px-4 py-2 text-sm text-navy focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors';
+  const searchInputCls = 'rounded-full border border-warm-border px-4 py-2 text-sm text-navy focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors';
 
   return (
     <AdminLayout
@@ -243,7 +227,7 @@ export default function AdminCoursesPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className={inputCls}
+            className={searchInputCls}
           >
             <option value="all">All Status</option>
             <option value="published">Published</option>

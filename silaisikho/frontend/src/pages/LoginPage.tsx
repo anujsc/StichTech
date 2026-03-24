@@ -5,8 +5,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import z from 'zod';
 import { AlertCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/components/shared/ToastProvider';
 import { IdentifierInput, PinInput, Button } from '@/components/ui';
-import { Navbar } from '@/components/shared';
+import { Navbar, SessionExpiredToast } from '@/components/shared';
 
 // ─── Form Schema ───────────────────────────────────────────────────────────
 
@@ -26,6 +27,7 @@ type LoginFormValues = z.infer<typeof LoginSchema>;
 
 export default function LoginPage() {
   const { login, isLoggedIn, isLoading } = useAuth();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const pinInputRef = useRef<HTMLInputElement>(null);
@@ -67,10 +69,12 @@ export default function LoginPage() {
     setServerError('');
     try {
       await login(data.identifier, data.pin);
+      showToast('Login successful! — लॉगिन सफल रहा', 'success');
       navigate(from, { replace: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Login failed';
       setServerError(message);
+      showToast(message, 'error');
     }
   };
 
@@ -92,6 +96,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
+      <SessionExpiredToast />
       <Navbar transparent={false} currentPath={location.pathname} />
 
       <div className="flex-1 flex items-center justify-center px-4 py-8">

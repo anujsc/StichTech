@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Mail, Phone, Lock, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/components/shared/ToastProvider';
 import { useProfile } from '@/hooks/useProfile';
 import { Navbar } from '@/components/shared';
 import { Button, Avatar, BilingualLabel, Spinner } from '@/components/ui';
@@ -36,6 +37,7 @@ type UpdateProfileFormValues = z.infer<typeof UpdateProfileSchema>;
 export default function ProfilePage() {
   const location = useLocation();
   const { currentUser, isLoading } = useAuth();
+  const { showToast } = useToast();
   const { isUpdating, updateError, updateSuccess, updateProfile } = useProfile();
   const [localError, setLocalError] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -90,6 +92,7 @@ export default function ProfilePage() {
     // Check if anything actually changed
     if (Object.keys(params).length === 0) {
       setLocalError('No changes detected — कोई बदलाव नहीं');
+      showToast('No changes detected — कोई बदलाव नहीं', 'info');
       return;
     }
 

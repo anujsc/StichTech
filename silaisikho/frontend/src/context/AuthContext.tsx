@@ -4,6 +4,7 @@ import { tokenStore } from '@/api/axiosInstance';
 import { loginUser, logoutUser, refreshTokens, registerUser, getMyProfile } from '@/api/authApi';
 import { Spinner } from '@/components/ui';
 import { DemoRoleSwitcher } from '@/components/shared/DemoRoleSwitcher';
+import { extractErrorMessage } from '@/utils/apiError';
 
 // ─── AuthContextType ──────────────────────────────────────────────────────────
 
@@ -55,12 +56,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Fetch the current user profile
           const profileResponse = await getMyProfile();
           if (isMounted && profileResponse.success && profileResponse.data) {
-            setCurrentUser(profileResponse.data);
+            setCurrentUser(profileResponse.data.user);
           }
         }
       } catch (error) {
         // No valid session — user is not logged in
-        // This is not an error, just means no cookie exists
+        // This is expected when no refresh token cookie exists
+        // Silently fail - don't log to console as this is normal behavior
+        if (isMounted) {
+          tokenStore.setToken(null);
+          setCurrentUser(null);
+          setAccessToken(null);
+        }
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -105,39 +112,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Real API signature: login(identifier: string, pin: string)
     const identifier = identifierOrUser as string;
     const pin = pinOrToken as string;
-    const response = await loginUser({ identifier, pin });
+    
+    try {
+      const response = await loginUser({ identifier, pin });
 
-    if (!response.success) {
-      throw new Error(response.message);
+      if (!response.success) {
+        throw new Error(response.message);
+      }
+
+      if (!response.data) {
+        throw new Error('No data in login response');
+      }
+
+      const { accessToken: newToken, user } = response.data;
+      tokenStore.setToken(newToken);
+      setAccessToken(newToken);
+      setCurrentUser(user);
+    } catch (error) {
+      throw new Error(extractErrorMessage(error));
     }
-
-    if (!response.data) {
-      throw new Error('No data in login response');
-    }
-
-    const { accessToken: newToken, user } = response.data;
-    tokenStore.setToken(newToken);
-    setAccessToken(newToken);
-    setCurrentUser(user);
   }, []);
 
   // ─── Register Function ────────────────────────────────────────────────────
 
   const register = useCallback(async (name: string, identifier: string, pin: string) => {
-    const response = await registerUser({ name, identifier, pin });
+    try {
+      const response = await registerUser({ name, identifier, pin });
 
-    if (!response.success) {
-      throw new Error(response.message);
+      if (!response.success) {
+        throw new Error(response.message);
+      }
+
+      if (!response.data) {
+        throw new Error('No data in register response');
+      }
+
+      const { accessToken: newToken, user } = response.data;
+      tokenStore.setToken(newToken);
+      setAccessToken(newToken);
+      setCurrentUser(user);
+    } catch (error) {
+      throw new Error(extractErrorMessage(error));
     }
-
-    if (!response.data) {
-      throw new Error('No data in register response');
-    }
-
-    const { accessToken: newToken, user } = response.data;
-    tokenStore.setToken(newToken);
-    setAccessToken(newToken);
-    setCurrentUser(user);
   }, []);
 
   // ─── Logout Function ──────────────────────────────────────────────────────
@@ -150,9 +166,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tokenStore.setToken(null);
       setCurrentUser(null);
       setAccessToken(null);
-      // Redirect to login using window.location instead of useNavigate
-      // because AuthProvider is outside Router context
-      window.location.href = '/login';
+      // Redirect to home page after logout
+      window.location.href = '/';
     }
   }, []);
 

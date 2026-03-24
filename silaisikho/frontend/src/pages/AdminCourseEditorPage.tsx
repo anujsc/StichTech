@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import {
   ExternalLink, Pencil, Trash2, Plus, GripVertical,
   Play, Lock, Upload, CheckCircle, FileX, Video as VideoIcon,
@@ -13,34 +12,8 @@ import { Button, Badge, BilingualLabel, ProgressBar, EmptyState } from '@/compon
 import { MOCK_COURSES, MOCK_ENROLLMENTS } from '@/mockData';
 import { ThumbnailGradientMap } from '@/types';
 import type { ICourse, IModule, IVideo, ThumbnailColour, CourseLanguage, CourseLevel } from '@/types';
-
-// ─── Shared Zod schema (same as AdminCoursesPage) ────────────────────────────
-const courseSchema = z.object({
-  title: z.string().min(5, 'Title must be at least 5 characters — शीर्षक कम से कम 5 अक्षर का होना चाहिए'),
-  description: z.string().min(50, 'Description must be at least 50 characters'),
-  price: z.number({ invalid_type_error: 'Price is required' }).min(99).max(9999),
-  language: z.enum(['Hindi', 'English', 'Mixed'] as [CourseLanguage, ...CourseLanguage[]]),
-  level: z.enum(['beginner', 'intermediate', 'advanced'] as [CourseLevel, ...CourseLevel[]]),
-  thumbnailColour: z.enum(['rose', 'amber', 'terracotta', 'marigold', 'burgundy', 'saffron'] as [ThumbnailColour, ...ThumbnailColour[]]),
-});
-type CourseFormValues = z.infer<typeof courseSchema>;
-
-const videoSchema = z.object({
-  title: z.string().min(3, 'Title must be at least 3 characters'),
-  description: z.string().optional(),
-});
-type VideoFormValues = z.infer<typeof videoSchema>;
-
-const THUMB_COLOURS: ThumbnailColour[] = ['rose', 'amber', 'terracotta', 'marigold', 'burgundy', 'saffron'];
-const LEVELS: CourseLevel[] = ['beginner', 'intermediate', 'advanced'];
-
-function fmtDur(s: number): string {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
-
-const inputCls = 'w-full rounded-xl border border-warm-border px-4 py-3 text-base text-navy focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors';
-const errCls = 'text-brand text-sm mt-1';
+import { courseSchema, videoSchema, type CourseFormValues, type VideoFormValues, THUMB_COLOURS, LEVELS, inputCls, errCls } from '@/schemas/course.schema';
+import { formatDuration } from '@/utils/format';
 
 // ─── Edit Course Form ─────────────────────────────────────────────────────────
 interface EditCourseFormProps {
@@ -367,7 +340,7 @@ export default function AdminCourseEditorPage() {
             {[
               { en: 'Total Modules', hi: 'कुल मॉड्यूल', val: course.modules.length },
               { en: 'Total Videos', hi: 'कुल वीडियो', val: course.totalVideos },
-              { en: 'Total Duration', hi: 'कुल अवधि', val: fmtDur(totalDur) },
+              { en: 'Total Duration', hi: 'कुल अवधि', val: formatDuration(totalDur) },
             ].map((row, i, arr) => (
               <div key={row.en} className={clsx('flex items-center justify-between py-2', i < arr.length - 1 ? 'border-b border-warm-border' : '')}>
                 <BilingualLabel english={row.en} hindi={row.hi} englishSize="sm" hindiSize="xs" gap="tight" />

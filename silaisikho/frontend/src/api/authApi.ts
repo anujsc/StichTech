@@ -39,9 +39,9 @@ export async function refreshTokens(): Promise<BackendResponse<RefreshResponse>>
 
 // ─── getMyProfile ─────────────────────────────────────────────────────────────
 
-export async function getMyProfile(): Promise<BackendResponse<BackendUser>> {
+export async function getMyProfile(): Promise<BackendResponse<{ user: BackendUser }>> {
   const response = await axiosInstance.get('/users/profile');
-  return response.data as BackendResponse<BackendUser>;
+  return response.data as BackendResponse<{ user: BackendUser }>;
 }
 
 // ─── updateMyProfile ──────────────────────────────────────────────────────────
@@ -49,9 +49,9 @@ export async function getMyProfile(): Promise<BackendResponse<BackendUser>> {
 export async function updateMyProfile(params: {
   name?: string;
   profilePicUrl?: string;
-}): Promise<BackendResponse<BackendUser>> {
+}): Promise<BackendResponse<{ user: BackendUser }>> {
   const response = await axiosInstance.patch('/users/profile', params);
-  return response.data as BackendResponse<BackendUser>;
+  return response.data as BackendResponse<{ user: BackendUser }>;
 }
 
 // ─── changeMyPin ──────────────────────────────────────────────────────────────

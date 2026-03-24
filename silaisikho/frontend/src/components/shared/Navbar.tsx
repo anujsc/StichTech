@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, ChevronDown, LayoutDashboard, LogOut, User } from 'lucide-react';
+import { Menu, X, ChevronDown, LayoutDashboard, LogOut, User, Settings } from 'lucide-react';
 import { clsx } from 'clsx';
-import { Button, BilingualLabel, Avatar } from '@/components/ui';
+import { Button, BilingualLabel, Avatar, Spinner } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
+import { useLogout } from '@/hooks/useLogout';
 
 export interface NavbarProps {
   transparent?: boolean;
@@ -33,103 +34,15 @@ function LogoSVG({ white }: { white?: boolean }) {
   );
 }
 
-// ─── User dropdown (logged-in state) ─────────────────────────────────────────
-function UserMenu({ isWhiteBg }: { isWhiteBg: boolean }) {
-  const { currentUser, isAdmin, logout } = useAuth();
-  const navigate = useNavigate();
-  const [open, setOpen] = useState<boolean>(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Close on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const handleLogout = () => {
-    logout();
-    setOpen(false);
-    navigate('/');
-  };
-
-  // Early return AFTER hooks to comply with Rules of Hooks
-  if (!currentUser) return null;
-
-  const firstName = currentUser.name?.split(' ')[0] || currentUser.name || 'User';
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={clsx(
-          'flex items-center gap-2 min-h-[48px] px-3 rounded-xl transition-colors',
-          isWhiteBg ? 'hover:bg-muted' : 'hover:bg-white/10'
-        )}
-        aria-label="User menu"
-        aria-expanded={open}
-      >
-        <Avatar name={currentUser.name || 'User'} size="sm" />
-        <span className={clsx('text-sm font-medium hidden lg:block max-w-[100px] truncate', isWhiteBg ? 'text-navy' : 'text-white')}>
-          {firstName}
-        </span>
-        <ChevronDown size={14} className={clsx('transition-transform', open && 'rotate-180', isWhiteBg ? 'text-warm-text' : 'text-white/70')} />
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-2xl shadow-card border border-warm-border overflow-hidden z-50">
-          {/* User info header */}
-          <div className="px-4 py-3 border-b border-warm-border">
-            <p className="text-navy text-sm font-semibold truncate">{currentUser.name || 'User'}</p>
-            <p className="text-warm-text text-xs truncate">{currentUser.email || currentUser.mobileNumber || ''}</p>
-            <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-brand/10 text-brand capitalize">
-              {currentUser.role || 'user'}
-            </span>
-          </div>
-
-          {/* Menu items */}
-          <div className="py-1">
-            <button
-              type="button"
-              onClick={() => { setOpen(false); navigate(isAdmin ? '/admin' : '/dashboard'); }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-navy hover:bg-muted transition-colors min-h-[44px]"
-            >
-              <LayoutDashboard size={16} className="text-warm-text shrink-0" />
-              {isAdmin ? 'Admin Dashboard' : 'My Dashboard'}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setOpen(false); navigate('/profile'); }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-navy hover:bg-muted transition-colors min-h-[44px]"
-            >
-              <User size={16} className="text-warm-text shrink-0" />
-              My Profile — प्रोफाइल
-            </button>
-            <div className="border-t border-warm-border my-1" />
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-brand hover:bg-brand/5 transition-colors min-h-[44px]"
-            >
-              <LogOut size={16} className="shrink-0" />
-              Logout — लॉगआउट
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 export function Navbar({ transparent = false, currentPath = '/' }: NavbarProps) {
   const [isScrolled, setIsScrolled] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [showUserMenu, setShowUserMenu] = useState<boolean>(false);
   const navigate = useNavigate();
-  const { isLoggedIn, isAdmin, currentUser, logout } = useAuth();
+  const { isLoggedIn, isLoading, isAdmin, currentUser } = useAuth();
+  const { handleLogout, isLoggingOut } = useLogout();
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 80);
@@ -137,9 +50,38 @@ export function Navbar({ transparent = false, currentPath = '/' }: NavbarProps) 
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Close user dropdown on outside click
+  useEffect(() => {
+    if (!showUserMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showUserMenu]);
+
+  // Close mobile menu when logged out
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setIsMobileMenuOpen(false);
+    }
+  }, [isLoggedIn]);
+
   const isWhiteBg = !transparent || isScrolled;
-  const textColour = isWhiteBg ? 'text-navy' : 'text-white';
-  const closeMobile = () => setIsMobileMenuOpen(false);
+  
+  const closeMobile = useCallback(() => setIsMobileMenuOpen(false), []);
+
+  const handleLogoutClick = useCallback(async () => {
+    setShowUserMenu(false);
+    await handleLogout();
+  }, [handleLogout]);
+
+  const handleMobileLogoutClick = useCallback(async () => {
+    closeMobile();
+    await handleLogout();
+  }, [closeMobile, handleLogout]);
 
   return (
     <>
@@ -170,7 +112,7 @@ export function Navbar({ transparent = false, currentPath = '/' }: NavbarProps) 
                   to={item.href}
                   className={clsx(
                     'pb-1 border-b-2 transition-colors duration-150',
-                    isActive ? 'border-brand text-brand' : 'border-transparent text-warm-text hover:text-brand'
+                    isActive ? 'border-brand text-brand' : isWhiteBg ? 'border-transparent text-warm-text hover:text-brand' : 'border-transparent text-navy hover:text-brand'
                   )}
                 >
                   <BilingualLabel english={item.english} hindi={item.hindi} englishSize="sm" hindiSize="xs" englishWeight="medium" gap="none" />
@@ -179,11 +121,98 @@ export function Navbar({ transparent = false, currentPath = '/' }: NavbarProps) 
             })}
           </div>
 
-          {/* Desktop right — auth-aware */}
+          {/* Desktop right — THREE STATES */}
           <div className="hidden md:flex items-center gap-3">
-            {isLoggedIn ? (
-              <UserMenu isWhiteBg={isWhiteBg} />
+            {isLoading ? (
+              // STATE 1: Loading skeleton
+              <div className="w-40 h-9 rounded-full bg-muted animate-pulse" />
+            ) : isLoggedIn ? (
+              // STATE 3: Logged in — user menu
+              <div ref={userMenuRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowUserMenu((v) => !v)}
+                  className={clsx(
+                    'flex items-center gap-2 rounded-full border border-warm px-3 py-1.5 transition-all min-h-[36px]',
+                    isWhiteBg ? 'hover:bg-muted' : 'hover:bg-white/10'
+                  )}
+                  aria-label="User menu"
+                  aria-expanded={showUserMenu}
+                >
+                  <Avatar name={currentUser?.name || 'User'} imageUrl={currentUser?.profilePicUrl} size="sm" />
+                  <span className={clsx('text-sm font-medium max-w-[100px] truncate', isWhiteBg ? 'text-navy' : 'text-white')}>
+                    {currentUser?.name ? (currentUser.name.length > 12 ? currentUser.name.slice(0, 12) + '...' : currentUser.name) : 'User'}
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    className={clsx('transition-transform', showUserMenu && 'rotate-180', isWhiteBg ? 'text-warm-text' : 'text-white/70')}
+                  />
+                </button>
+
+                {/* User dropdown */}
+                {showUserMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-card border border-warm z-50 py-2 overflow-hidden animate-fade-in">
+                    {/* Header */}
+                    <div className="px-4 py-3 border-b border-warm">
+                      <p className="text-navy text-sm font-medium truncate">{currentUser?.name || 'User'}</p>
+                      <p className="text-warm-text text-xs truncate">{currentUser?.email || currentUser?.mobileNumber || ''}</p>
+                    </div>
+
+                    {/* Menu items */}
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setShowUserMenu(false)}
+                      className="px-4 py-2.5 flex items-center gap-3 hover:bg-muted text-sm text-primary transition-colors"
+                    >
+                      <LayoutDashboard size={16} className="text-warm-text" />
+                      <span>My Dashboard — मेरा Dashboard</span>
+                    </Link>
+
+                    <Link
+                      to="/profile"
+                      onClick={() => setShowUserMenu(false)}
+                      className="px-4 py-2.5 flex items-center gap-3 hover:bg-muted text-sm text-primary transition-colors"
+                    >
+                      <User size={16} className="text-warm-text" />
+                      <span>My Profile — मेरी Profile</span>
+                    </Link>
+
+                    {isAdmin && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setShowUserMenu(false)}
+                        className="px-4 py-2.5 flex items-center gap-3 hover:bg-muted text-sm text-primary transition-colors"
+                      >
+                        <Settings size={16} className="text-warm-text" />
+                        <span>Admin Panel — Admin</span>
+                      </Link>
+                    )}
+
+                    <div className="border-t border-warm mx-2" />
+
+                    <button
+                      type="button"
+                      onClick={handleLogoutClick}
+                      disabled={isLoggingOut}
+                      className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-red-50 text-sm text-red-600 transition-all disabled:opacity-50"
+                    >
+                      {isLoggingOut ? (
+                        <>
+                          <Spinner size="sm" colour="brand" />
+                          <span>Logging out...</span>
+                        </>
+                      ) : (
+                        <>
+                          <LogOut size={16} />
+                          <span>Logout — लॉगआउट</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
+              // STATE 2: Logged out — auth buttons
               <>
                 <button
                   onClick={() => navigate('/login')}
@@ -203,7 +232,7 @@ export function Navbar({ transparent = false, currentPath = '/' }: NavbarProps) 
 
           {/* Mobile hamburger */}
           <button
-            className={clsx('md:hidden flex items-center justify-center w-12 h-12 rounded-lg', textColour)}
+            className={clsx('md:hidden flex items-center justify-center w-12 h-12 rounded-lg', isWhiteBg ? 'text-navy' : 'text-white')}
             onClick={() => setIsMobileMenuOpen((v) => !v)}
             aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
           >
@@ -215,17 +244,22 @@ export function Navbar({ transparent = false, currentPath = '/' }: NavbarProps) 
         <div className={clsx('md:hidden overflow-hidden transition-all duration-300 bg-card border-t border-warm-border', isMobileMenuOpen ? 'max-h-screen' : 'max-h-0')}>
           <div className="px-4 py-4 flex flex-col gap-2">
 
-            {/* Logged-in user info on mobile */}
-            {isLoggedIn && currentUser && (
+            {/* THREE STATES for mobile */}
+            {isLoading ? (
+              // STATE 1: Loading skeleton
+              <div className="w-full h-12 rounded-xl bg-muted animate-pulse" />
+            ) : isLoggedIn && currentUser ? (
+              // STATE 3: Logged in user info
               <div className="flex items-center gap-3 px-3 py-3 bg-muted rounded-xl mb-1">
-                <Avatar name={currentUser.name} size="sm" />
+                <Avatar name={currentUser.name} imageUrl={currentUser.profilePicUrl} size="sm" />
                 <div className="min-w-0">
                   <p className="text-navy text-sm font-semibold truncate">{currentUser.name}</p>
-                  <p className="text-warm-text text-xs truncate">{currentUser.email}</p>
+                  <p className="text-warm-text text-xs truncate">{currentUser.email || currentUser.mobileNumber}</p>
                 </div>
               </div>
-            )}
+            ) : null}
 
+            {/* Nav items */}
             {NAV_ITEMS.map((item) => {
               const isActive = currentPath === item.href;
               return (
@@ -243,20 +277,72 @@ export function Navbar({ transparent = false, currentPath = '/' }: NavbarProps) 
               );
             })}
 
+            {/* Bottom section — THREE STATES */}
             <div className="pt-3 flex flex-col gap-2 border-t border-warm-border">
-              {isLoggedIn ? (
+              {isLoading ? (
+                // STATE 1: Loading skeleton
+                <div className="w-full h-10 rounded-xl bg-muted animate-pulse" />
+              ) : isLoggedIn ? (
+                // STATE 3: Logged in menu items
                 <>
-                  <Button variant="outline" size="md" fullWidth onClick={() => { navigate(isAdmin ? '/admin' : '/dashboard'); closeMobile(); }}>
+                  <Button
+                    variant="outline"
+                    size="md"
+                    fullWidth
+                    onClick={() => {
+                      navigate(isAdmin ? '/admin' : '/dashboard');
+                      closeMobile();
+                    }}
+                  >
+                    <LayoutDashboard size={16} className="mr-2" />
                     <BilingualLabel english={isAdmin ? 'Admin Dashboard' : 'My Dashboard'} hindi="डैशबोर्ड" englishSize="sm" hindiSize="xs" gap="none" />
                   </Button>
-                  <Button variant="outline" size="md" fullWidth onClick={() => { navigate('/profile'); closeMobile(); }}>
+                  <Button
+                    variant="outline"
+                    size="md"
+                    fullWidth
+                    onClick={() => {
+                      navigate('/profile');
+                      closeMobile();
+                    }}
+                  >
+                    <User size={16} className="mr-2" />
                     <BilingualLabel english="My Profile" hindi="प्रोफाइल" englishSize="sm" hindiSize="xs" gap="none" />
                   </Button>
-                  <Button variant="primary" size="md" fullWidth onClick={() => { logout(); navigate('/'); closeMobile(); }}>
-                    <BilingualLabel english="Logout" hindi="लॉगआउट" englishSize="sm" hindiSize="xs" gap="none" className="text-white" />
+                  {isAdmin && (
+                    <Button
+                      variant="outline"
+                      size="md"
+                      fullWidth
+                      onClick={() => {
+                        navigate('/admin');
+                        closeMobile();
+                      }}
+                    >
+                      <Settings size={16} className="mr-2" />
+                      <BilingualLabel english="Admin Panel" hindi="Admin" englishSize="sm" hindiSize="xs" gap="none" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="primary"
+                    size="md"
+                    fullWidth
+                    onClick={handleMobileLogoutClick}
+                    disabled={isLoggingOut}
+                    loading={isLoggingOut}
+                  >
+                    {isLoggingOut ? (
+                      <BilingualLabel english="Logging out..." hindi="..." englishSize="sm" hindiSize="xs" gap="none" className="text-white" />
+                    ) : (
+                      <>
+                        <LogOut size={16} className="mr-2" />
+                        <BilingualLabel english="Logout" hindi="लॉगआउट" englishSize="sm" hindiSize="xs" gap="none" className="text-white" />
+                      </>
+                    )}
                   </Button>
                 </>
               ) : (
+                // STATE 2: Logged out buttons
                 <>
                   <Button variant="outline" size="md" fullWidth onClick={() => { navigate('/login'); closeMobile(); }}>
                     <BilingualLabel english="Login" hindi="लॉगिन" englishSize="sm" hindiSize="xs" gap="none" />

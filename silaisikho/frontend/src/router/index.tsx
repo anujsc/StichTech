@@ -1,94 +1,99 @@
-import { createBrowserRouter, Navigate, Outlet, RouterProvider, useLocation } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
+import { lazy } from 'react';
+import { createBrowserRouter, Outlet, RouterProvider } from 'react-router-dom';
 import { useScrollToTop } from '@/hooks/useScrollToTop';
-import { Spinner } from '@/components/ui';
+import { ErrorBoundary, RouteGuard, RouteSuspense } from '@/components/shared';
 
+// ─── Eager-loaded pages (critical for initial render) ────────────────────────
 import LandingPage from '@/pages/LandingPage';
-import DesignSystemTestPage from '@/pages/DesignSystemTestPage';
-import CourseCatalogPage from '@/pages/CourseCatalogPage';
-import CourseDetailPage from '@/pages/CourseDetailPage';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
-import StudentDashboardPage from '@/pages/StudentDashboardPage';
-import WatchVideoPage from '@/pages/WatchVideoPage';
-import AdminDashboardPage from '@/pages/AdminDashboardPage';
-import AdminCoursesPage from '@/pages/AdminCoursesPage';
-import AdminCourseEditorPage from '@/pages/AdminCourseEditorPage';
-import AdminStudentsPage from '@/pages/AdminStudentsPage';
 import NotFoundPage from '@/pages/NotFoundPage';
-import ProfilePage from '@/pages/ProfilePage';
-import ChangePinPage from '@/pages/ChangePinPage';
 
-// ─── Guards ───────────────────────────────────────────────────────────────────
-function PrivateRoute() {
-  const { isLoggedIn, isLoading } = useAuth();
-  const location = useLocation();
+// ─── Lazy-loaded pages (code-splitting for better performance) ───────────────
+const CourseCatalogPage = lazy(() => import('@/pages/CourseCatalogPage'));
+const CourseDetailPage = lazy(() => import('@/pages/CourseDetailPage'));
+const StudentDashboardPage = lazy(() => import('@/pages/StudentDashboardPage'));
+const WatchVideoPage = lazy(() => import('@/pages/WatchVideoPage'));
+const ProfilePage = lazy(() => import('@/pages/ProfilePage'));
+const ChangePinPage = lazy(() => import('@/pages/ChangePinPage'));
+const AdminDashboardPage = lazy(() => import('@/pages/AdminDashboardPage'));
+const AdminCoursesPage = lazy(() => import('@/pages/AdminCoursesPage'));
+const AdminCourseEditorPage = lazy(() => import('@/pages/AdminCourseEditorPage'));
+const AdminStudentsPage = lazy(() => import('@/pages/AdminStudentsPage'));
+const DesignSystemTestPage = lazy(() => import('@/pages/DesignSystemTestPage'));
 
-  // Wait for auth state to be resolved before making routing decision
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-white">
-        <Spinner size="lg" colour="brand" />
-      </div>
-    );
-  }
-
-  // Not authenticated - redirect to login with return path
-  if (!isLoggedIn) {
-    return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
-  }
-
-  // Authenticated - render protected content
-  return <Outlet />;
-}
-
-function AdminRoute() {
-  const { isLoggedIn, isAdmin, isLoading } = useAuth();
-  const location = useLocation();
-
-  // Wait for auth state to be resolved
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-white">
-        <Spinner size="lg" colour="brand" />
-      </div>
-    );
-  }
-
-  // Not authenticated - redirect to login
-  if (!isLoggedIn) {
-    return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
-  }
-
-  // Authenticated but not admin - redirect to dashboard
-  if (!isAdmin) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  // Authenticated as admin - render admin content
-  return <Outlet />;
-}
-
-// ─── Root layout — scroll-to-top lives here ───────────────────────────────────
+// ─── Root layout with scroll-to-top ───────────────────────────────────────────
 function RootLayout() {
   useScrollToTop();
-  return <Outlet />;
+  return (
+    <ErrorBoundary>
+      <Outlet />
+    </ErrorBoundary>
+  );
 }
 
-// ─── Router ───────────────────────────────────────────────────────────────────
+// ─── Protected route wrapper ──────────────────────────────────────────────────
+function ProtectedRoute() {
+  return (
+    <RouteGuard requireAuth>
+      <RouteSuspense>
+        <Outlet />
+      </RouteSuspense>
+    </RouteGuard>
+  );
+}
+
+// ─── Admin route wrapper ──────────────────────────────────────────────────────
+function AdminRoute() {
+  return (
+    <RouteGuard requireAuth requireAdmin>
+      <RouteSuspense>
+        <Outlet />
+      </RouteSuspense>
+    </RouteGuard>
+  );
+}
+
+// ─── Router configuration ─────────────────────────────────────────────────────
 const router = createBrowserRouter([
   {
     element: <RootLayout />,
     children: [
-      { index: true, element: <LandingPage /> },
-      { path: '/design-system', element: <DesignSystemTestPage /> },
-      { path: '/courses', element: <CourseCatalogPage /> },
-      { path: '/courses/:courseId', element: <CourseDetailPage /> },
-      { path: '/login', element: <LoginPage /> },
-      { path: '/register', element: <RegisterPage /> },
+      // Public routes (no lazy loading for critical pages)
+      { 
+        index: true, 
+        element: <LandingPage />,
+      },
+      { 
+        path: '/login', 
+        element: <LoginPage />,
+      },
+      { 
+        path: '/register', 
+        element: <RegisterPage />,
+      },
 
+      // Public routes (lazy-loaded)
       {
-        element: <PrivateRoute />,
+        path: '/courses',
+        element: (
+          <RouteSuspense>
+            <CourseCatalogPage />
+          </RouteSuspense>
+        ),
+      },
+      {
+        path: '/courses/:courseId',
+        element: (
+          <RouteSuspense>
+            <CourseDetailPage />
+          </RouteSuspense>
+        ),
+      },
+
+      // Protected routes (student)
+      {
+        element: <ProtectedRoute />,
         children: [
           { path: '/dashboard', element: <StudentDashboardPage /> },
           { path: '/profile', element: <ProfilePage /> },
@@ -97,6 +102,7 @@ const router = createBrowserRouter([
         ],
       },
 
+      // Admin routes
       {
         element: <AdminRoute />,
         children: [
@@ -107,11 +113,23 @@ const router = createBrowserRouter([
         ],
       },
 
+      // Development route (lazy-loaded)
+      {
+        path: '/design-system',
+        element: (
+          <RouteSuspense>
+            <DesignSystemTestPage />
+          </RouteSuspense>
+        ),
+      },
+
+      // 404 fallback
       { path: '*', element: <NotFoundPage /> },
     ],
   },
 ]);
 
+// ─── Router provider ──────────────────────────────────────────────────────────
 export default function AppRouter() {
   return <RouterProvider router={router} />;
 }

@@ -56,6 +56,11 @@ axiosInstance.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Don't retry on login or register endpoints - these are intentional 401s
+    if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/register')) {
+      return Promise.reject(error);
+    }
+
     // Check if this is a 401 that should trigger a refresh
     const should401Refresh =
       error.response &&
@@ -116,8 +121,12 @@ axiosInstance.interceptors.response.use(
       }
       return axiosInstance(originalRequest);
     } catch (refreshError) {
-      // Refresh failed — redirect to login
-      window.location.href = '/login';
+      // Refresh failed — set session expired flag and redirect to login
+      // Only redirect if we're not already on the login page
+      if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+        localStorage.setItem('silaisikho-session-expired', 'true');
+        window.location.href = '/login';
+      }
       return Promise.reject(refreshError);
     }
   }
