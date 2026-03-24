@@ -19,6 +19,7 @@ export interface IModuleDocument extends mongoose.Document {
 
 export interface ICourseDocument extends mongoose.Document {
   title: string;
+  slug: string;
   description: string;
   thumbnailColour: 'rose' | 'amber' | 'terracotta' | 'marigold' | 'burgundy' | 'saffron';
   price: number;
@@ -26,6 +27,7 @@ export interface ICourseDocument extends mongoose.Document {
   language: 'Hindi' | 'English' | 'Mixed';
   level: 'beginner' | 'intermediate' | 'advanced';
   status: 'draft' | 'published';
+  isDeleted: boolean;
   instructor: mongoose.Types.ObjectId;
   modules: mongoose.Types.DocumentArray<IModuleDocument>;
   totalModules: number;
@@ -37,6 +39,19 @@ export interface ICourseDocument extends mongoose.Document {
 
 export interface ICourseModel extends mongoose.Model<ICourseDocument> {
   findPublished(): Promise<ICourseDocument[]>;
+  findBySlug(slug: string): Promise<ICourseDocument | null>;
+  adminFindById(id: string): Promise<ICourseDocument | null>;
+}
+
+// ─── Slug Generation Utility ──────────────────────────────────────────────────
+
+function generateSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 // ─── VideoSchema ──────────────────────────────────────────────────────────────
@@ -120,6 +135,13 @@ const CourseSchema = new mongoose.Schema<ICourseDocument>(
       trim: true,
       maxlength: [200, 'Course title cannot exceed 200 characters'],
     },
+    slug: {
+      type: String,
+      required: false,
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
     description: {
       type: String,
       required: [true, 'Description is required'],
@@ -146,7 +168,7 @@ const CourseSchema = new mongoose.Schema<ICourseDocument>(
         validator: function (this: ICourseDocument, value: number): boolean {
           return value === undefined || value < this.price;
         },
-        message: 'Discounted price must be less than regular price',
+        message: 'Discounted price must be less than regular price — डिस्काउंट कीमत मूल कीमत से कम होनी चाहिए',
       },
     },
     language: {
@@ -174,6 +196,11 @@ const CourseSchema = new mongoose.Schema<ICourseDocument>(
         message: 'Invalid status',
       },
       default: 'draft',
+    },
+    isDeleted: {
+      type: Boolean,
+      required: true,
+      default: false,
     },
     instructor: {
       type: mongoose.Schema.Types.ObjectId,
@@ -208,7 +235,37 @@ const CourseSchema = new mongoose.Schema<ICourseDocument>(
 
 // ─── Pre-save middleware ───────────────────────────────────────────────────────
 
+CourseSchema.pre('validate', async function (next): Promise<void> {
+  // Generate or update slug if title was modified
+  if (this.isNew || this.isModified('title')) {
+    const baseSlug = generateSlug(this.title);
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+
+    // Ensure uniqueness by checking existing slugs
+    const CourseModel = this.constructor as ICourseModel;
+    while (true) {
+      const existing = await CourseModel.findOne({
+        slug: uniqueSlug,
+        _id: { $ne: this._id },
+      });
+
+      if (!existing) {
+        break;
+      }
+
+      uniqueSlug = `${baseSlug}-${counter}`;
+      counter++;
+    }
+
+    this.slug = uniqueSlug;
+  }
+
+  next();
+});
+
 CourseSchema.pre('save', function (next): void {
+  // Recalculate denormalized fields
   this.totalModules = this.modules.length;
 
   this.totalVideos = this.modules.reduce(
@@ -231,14 +288,37 @@ CourseSchema.pre('save', function (next): void {
 
 // ─── Indexes ──────────────────────────────────────────────────────────────────
 
-CourseSchema.index({ title: 'text', description: 'text' });
+// 1. Text index for search (with language_override to avoid conflict with language field)
+CourseSchema.index(
+  { title: 'text', description: 'text' },
+  { language_override: 'textSearchLanguage', default_language: 'none' }
+);
+
+// 2. Single field indexes
 CourseSchema.index({ status: 1 });
+CourseSchema.index({ slug: 1 }, { unique: true });
+CourseSchema.index({ isDeleted: 1 });
+
+// 3. Compound indexes for filtered queries
 CourseSchema.index({ instructor: 1, status: 1 });
+CourseSchema.index({ level: 1, status: 1 });
+CourseSchema.index({ language: 1, status: 1 });
+CourseSchema.index({ price: 1, status: 1 });
+CourseSchema.index({ createdAt: -1, status: 1 });
 
 // ─── Static methods ───────────────────────────────────────────────────────────
 
 CourseSchema.statics.findPublished = function (): Promise<ICourseDocument[]> {
-  return this.find({ status: 'published' }).sort({ createdAt: -1 });
+  return this.find({ status: 'published', isDeleted: false }).sort({ createdAt: -1 });
+};
+
+CourseSchema.statics.findBySlug = function (slug: string): Promise<ICourseDocument | null> {
+  return this.findOne({ slug, status: 'published', isDeleted: false })
+    .populate('instructor', 'name email profilePicUrl');
+};
+
+CourseSchema.statics.adminFindById = function (id: string): Promise<ICourseDocument | null> {
+  return this.findById(id).populate('instructor');
 };
 
 // ─── Model ────────────────────────────────────────────────────────────────────

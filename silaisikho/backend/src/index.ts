@@ -12,6 +12,7 @@ import { errorHandler, globalRateLimiter } from '@/middleware/index';
 import authRouter from '@/routes/auth';
 import userRouter from '@/routes/user';
 import adminRouter from '@/routes/admin';
+import courseRouter from '@/routes/courses';
 import healthRouter from '@/routes/health';
 
 // Import models before any route registration — order reflects reference dependency chain
@@ -85,6 +86,7 @@ app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/courses', courseRouter);
 
 // ─── 12. Global error handler — must be last ──────────────────────────────────
 app.use(errorHandler);
