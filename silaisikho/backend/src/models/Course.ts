@@ -138,7 +138,6 @@ const CourseSchema = new mongoose.Schema<ICourseDocument>(
     slug: {
       type: String,
       required: false,
-      unique: true,
       trim: true,
       lowercase: true,
     },

@@ -235,3 +235,134 @@ export type AdminCreateCourse = z.infer<typeof adminCreateCourseSchema>;
 export type AdminUpdateCourse = z.infer<typeof adminUpdateCourseSchema>;
 export type AdminCourseIdParam = z.infer<typeof adminCourseIdParamSchema>;
 export type AdminStudentListQuery = z.infer<typeof adminStudentListQuerySchema>;
+
+// ─── Module and Video Schemas ─────────────────────────────────────────────────
+
+export const adminAddModuleSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, 'Module title is required — मॉड्यूल शीर्षक आवश्यक है')
+    .max(200, 'Module title cannot exceed 200 characters — मॉड्यूल शीर्षक 200 अक्षर से अधिक नहीं हो सकता'),
+  
+  sortOrder: z
+    .number()
+    .int('Sort order must be an integer — सॉर्ट ऑर्डर एक पूर्णांक होना चाहिए')
+    .min(0, 'Sort order cannot be negative — सॉर्ट ऑर्डर नकारात्मक नहीं हो सकता'),
+});
+
+export const adminUpdateModuleSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, 'Module title is required — मॉड्यूल शीर्षक आवश्यक है')
+    .max(200, 'Module title cannot exceed 200 characters — मॉड्यूल शीर्षक 200 अक्षर से अधिक नहीं हो सकता')
+    .optional(),
+  
+  sortOrder: z
+    .number()
+    .int('Sort order must be an integer — सॉर्ट ऑर्डर एक पूर्णांक होना चाहिए')
+    .min(0, 'Sort order cannot be negative — सॉर्ट ऑर्डर नकारात्मक नहीं हो सकता')
+    .optional(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: 'At least one field must be provided — कम से कम एक फील्ड प्रदान करना चाहिए' }
+);
+
+export const adminAddVideoSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, 'Video title is required — वीडियो शीर्षक आवश्यक है')
+    .max(200, 'Video title cannot exceed 200 characters — वीडियो शीर्षक 200 अक्षर से अधिक नहीं हो सकता'),
+  
+  description: z
+    .string()
+    .trim()
+    .max(2000, 'Description cannot exceed 2000 characters — विवरण 2000 अक्षर से अधिक नहीं हो सकता')
+    .optional(),
+  
+  sortOrder: z
+    .number()
+    .int('Sort order must be an integer — सॉर्ट ऑर्डर एक पूर्णांक होना चाहिए')
+    .min(0, 'Sort order cannot be negative — सॉर्ट ऑर्डर नकारात्मक नहीं हो सकता'),
+  
+  isFreePreview: z
+    .boolean()
+    .optional()
+    .default(false),
+});
+
+export const adminUpdateVideoSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, 'Video title is required — वीडियो शीर्षक आवश्यक है')
+    .max(200, 'Video title cannot exceed 200 characters — वीडियो शीर्षक 200 अक्षर से अधिक नहीं हो सकता')
+    .optional(),
+  
+  description: z
+    .string()
+    .trim()
+    .max(2000, 'Description cannot exceed 2000 characters — विवरण 2000 अक्षर से अधिक नहीं हो सकता')
+    .optional(),
+  
+  sortOrder: z
+    .number()
+    .int('Sort order must be an integer — सॉर्ट ऑर्डर एक पूर्णांक होना चाहिए')
+    .min(0, 'Sort order cannot be negative — सॉर्ट ऑर्डर नकारात्मक नहीं हो सकता')
+    .optional(),
+  
+  isFreePreview: z
+    .boolean()
+    .optional(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: 'At least one field must be provided — कम से कम एक फील्ड प्रदान करना चाहिए' }
+);
+
+export const adminModuleVideoParamSchema = z.object({
+  courseId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid course ID format — गलत course ID'),
+  moduleId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid module ID format — गलत module ID'),
+});
+
+export const adminVideoParamSchema = z.object({
+  courseId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid course ID format — गलत course ID'),
+  moduleId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid module ID format — गलत module ID'),
+  videoId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid video ID format — गलत video ID'),
+});
+
+// ─── Module and Video Inferred Types ───────────────────────────────────────────
+
+export type AdminAddModule = z.infer<typeof adminAddModuleSchema>;
+export type AdminUpdateModule = z.infer<typeof adminUpdateModuleSchema>;
+export type AdminAddVideo = z.infer<typeof adminAddVideoSchema>;
+export type AdminUpdateVideo = z.infer<typeof adminUpdateVideoSchema>;
+export type AdminModuleVideoParam = z.infer<typeof adminModuleVideoParamSchema>;
+export type AdminVideoParam = z.infer<typeof adminVideoParamSchema>;
+
+// ─── Upload URL Query Schema ──────────────────────────────────────────────────
+
+export const uploadUrlQuerySchema = z.object({
+  courseId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid course ID format — गलत course ID'),
+  moduleId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid module ID format — गलत module ID'),
+  videoId: z
+    .string()
+    .regex(/^[0-9a-fA-F]{24}$/, 'Invalid video ID format — गलत video ID'),
+});
+
+export type UploadUrlQuery = z.infer<typeof uploadUrlQuerySchema>;

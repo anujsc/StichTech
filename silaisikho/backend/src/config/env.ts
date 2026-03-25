@@ -46,10 +46,11 @@ const envSchema = z.object({
   EMAIL_APP_PASSWORD: z.string().optional(),
 
   // Cloudinary — required when video upload is implemented
-  CLOUDINARY_CLOUD_NAME: z.string().optional(),
-  CLOUDINARY_API_KEY: z.string().optional(),
-  CLOUDINARY_API_SECRET: z.string().optional(),
-  CLOUDINARY_UPLOAD_PRESET: z.string().optional(),
+  CLOUDINARY_CLOUD_NAME: z.string().min(1, 'CLOUDINARY_CLOUD_NAME is required'),
+  CLOUDINARY_API_KEY: z.string().min(1, 'CLOUDINARY_API_KEY is required'),
+  CLOUDINARY_API_SECRET: z.string().min(1, 'CLOUDINARY_API_SECRET is required'),
+  CLOUDINARY_UPLOAD_PRESET: z.string().min(1, 'CLOUDINARY_UPLOAD_PRESET is required'),
+  CLOUDINARY_WEBHOOK_URL: z.string().url('CLOUDINARY_WEBHOOK_URL must be a valid URL'),
 
   // Razorpay — required when payments are implemented
   RAZORPAY_KEY_ID: z.string().optional(),

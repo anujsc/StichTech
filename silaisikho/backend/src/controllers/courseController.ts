@@ -3,6 +3,7 @@ import { asyncHandler } from '@/middleware/asyncHandler';
 import { sendSuccess, sendError, sendPaginatedSuccess } from '@/utils/response';
 import Course from '@/models/Course';
 import type { ICourseDocument } from '@/models/Course';
+import { z } from 'zod';
 import {
   courseListQuerySchema,
   courseSearchQuerySchema,
@@ -263,6 +264,12 @@ import {
   adminCreateCourseSchema,
   adminUpdateCourseSchema,
   adminCourseIdParamSchema,
+  adminAddModuleSchema,
+  adminUpdateModuleSchema,
+  adminAddVideoSchema,
+  adminUpdateVideoSchema,
+  adminModuleVideoParamSchema,
+  adminVideoParamSchema,
 } from '@/validators/courseValidators';
 
 // ─── adminGetAllCourses ───────────────────────────────────────────────────────
@@ -570,5 +577,423 @@ export const adminUnpublishCourse = asyncHandler(
     await course.save();
 
     sendSuccess(res, course, 'Course unpublished successfully — कोर्स unpublish हो गया');
+  }
+);
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODULE CONTROLLERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── adminAddModule ───────────────────────────────────────────────────────────
+/**
+ * POST /api/admin/courses/:courseId/modules
+ * Admin endpoint — adds a new module to a course.
+ */
+
+export const adminAddModule = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Validate params
+    const paramsValidation = adminModuleVideoParamSchema.safeParse(req.params);
+    
+    if (!paramsValidation.success) {
+      sendError(res, 'Invalid parameters — गलत parameters', 400);
+      return;
+    }
+
+    // Validate body
+    const bodyValidation = adminAddModuleSchema.safeParse(req.body);
+    
+    if (!bodyValidation.success) {
+      const errors = bodyValidation.error.errors.map((err) => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }));
+      sendError(res, 'Invalid module data — गलत module डेटा', 400, errors);
+      return;
+    }
+
+    const { courseId } = paramsValidation.data;
+    const { title, sortOrder } = bodyValidation.data;
+
+    // Find course
+    const course = await Course.findById(courseId);
+
+    if (!course) {
+      sendError(res, 'Course not found — कोर्स नहीं मिला', 404);
+      return;
+    }
+
+    // Create new module
+    const newModule = {
+      title,
+      sortOrder,
+      videos: [],
+    };
+
+    // Push to modules array
+    course.modules.push(newModule as any);
+
+    // Save course (pre-save middleware will recalculate totals)
+    await course.save();
+
+    sendSuccess(res, course, 'Module added successfully — मॉड्यूल जोड़ा गया', 201);
+  }
+);
+
+// ─── adminUpdateModule ────────────────────────────────────────────────────────
+/**
+ * PUT /api/admin/courses/:courseId/modules/:moduleId
+ * Admin endpoint — updates module title or sort order.
+ */
+
+export const adminUpdateModule = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Validate params
+    const paramsValidation = adminModuleVideoParamSchema.safeParse(req.params);
+    
+    if (!paramsValidation.success) {
+      sendError(res, 'Invalid parameters — गलत parameters', 400);
+      return;
+    }
+
+    // Validate body
+    const bodyValidation = adminUpdateModuleSchema.safeParse(req.body);
+    
+    if (!bodyValidation.success) {
+      const errors = bodyValidation.error.errors.map((err) => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }));
+      sendError(res, 'Invalid module data — गलत module डेटा', 400, errors);
+      return;
+    }
+
+    const { courseId, moduleId } = paramsValidation.data;
+    const updateData = bodyValidation.data;
+
+    // Find course
+    const course = await Course.findById(courseId);
+
+    if (!course) {
+      sendError(res, 'Course not found — कोर्स नहीं मिला', 404);
+      return;
+    }
+
+    // Find module
+    const module = course.modules.id(moduleId);
+
+    if (!module) {
+      sendError(res, 'Module not found — मॉड्यूल नहीं मिला', 404);
+      return;
+    }
+
+    // Update fields
+    if (updateData.title !== undefined) module.title = updateData.title;
+    if (updateData.sortOrder !== undefined) module.sortOrder = updateData.sortOrder;
+
+    // Save course
+    await course.save();
+
+    sendSuccess(res, course, 'Module updated successfully — मॉड्यूल अपडेट हो गया');
+  }
+);
+
+// ─── adminDeleteModule ────────────────────────────────────────────────────────
+/**
+ * DELETE /api/admin/courses/:courseId/modules/:moduleId
+ * Admin endpoint — deletes a module (only if it has no videos).
+ */
+
+export const adminDeleteModule = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Validate params
+    const paramsValidation = adminModuleVideoParamSchema.safeParse(req.params);
+    
+    if (!paramsValidation.success) {
+      sendError(res, 'Invalid parameters — गलत parameters', 400);
+      return;
+    }
+
+    const { courseId, moduleId } = paramsValidation.data;
+
+    // Find course
+    const course = await Course.findById(courseId);
+
+    if (!course) {
+      sendError(res, 'Course not found — कोर्स नहीं मिला', 404);
+      return;
+    }
+
+    // Find module
+    const module = course.modules.id(moduleId);
+
+    if (!module) {
+      sendError(res, 'Module not found — मॉड्यूल नहीं मिला', 404);
+      return;
+    }
+
+    // Check if module has videos
+    if (module.videos.length > 0) {
+      sendError(
+        res,
+        'Cannot delete module with videos — वीडियो वाले module को नहीं हटा सकते',
+        400
+      );
+      return;
+    }
+
+    // Remove module
+    course.modules.pull(moduleId);
+
+    // Save course
+    await course.save();
+
+    sendSuccess(res, course, 'Module deleted successfully — मॉड्यूल हटा दिया गया');
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VIDEO CONTROLLERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── adminAddVideo ────────────────────────────────────────────────────────────
+/**
+ * POST /api/admin/courses/:courseId/modules/:moduleId/videos
+ * Admin endpoint — adds a new video to a module.
+ * cloudinaryPublicId and durationSeconds are set to empty/zero initially.
+ */
+
+export const adminAddVideo = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Validate params
+    const paramsValidation = adminModuleVideoParamSchema.safeParse(req.params);
+    
+    if (!paramsValidation.success) {
+      sendError(res, 'Invalid parameters — गलत parameters', 400);
+      return;
+    }
+
+    // Validate body
+    const bodyValidation = adminAddVideoSchema.safeParse(req.body);
+    
+    if (!bodyValidation.success) {
+      const errors = bodyValidation.error.errors.map((err) => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }));
+      sendError(res, 'Invalid video data — गलत video डेटा', 400, errors);
+      return;
+    }
+
+    const { courseId, moduleId } = paramsValidation.data;
+    const { title, description, sortOrder, isFreePreview } = bodyValidation.data;
+
+    // Find course
+    const course = await Course.findById(courseId);
+
+    if (!course) {
+      sendError(res, 'Course not found — कोर्स नहीं मिला', 404);
+      return;
+    }
+
+    // Find module
+    const module = course.modules.id(moduleId);
+
+    if (!module) {
+      sendError(res, 'Module not found — मॉड्यूल नहीं मिला', 404);
+      return;
+    }
+
+    // Create new video
+    const newVideo = {
+      title,
+      description: description || '',
+      sortOrder,
+      isFreePreview: isFreePreview || false,
+      cloudinaryPublicId: '',
+      durationSeconds: 0,
+    };
+
+    // Push to videos array
+    module.videos.push(newVideo as any);
+
+    // Save course (pre-save middleware will recalculate totals)
+    await course.save();
+
+    sendSuccess(res, course, 'Video added successfully — वीडियो जोड़ा गया', 201);
+  }
+);
+
+// ─── adminUpdateVideo ────────────────────────────────────────────────────────
+/**
+ * PUT /api/admin/courses/:courseId/modules/:moduleId/videos/:videoId
+ * Admin endpoint — updates video metadata (title, description, sortOrder, isFreePreview).
+ * cloudinaryPublicId and durationSeconds cannot be modified (reserved for webhook).
+ */
+
+export const adminUpdateVideo = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Validate params
+    const paramsValidation = adminVideoParamSchema.safeParse(req.params);
+    
+    if (!paramsValidation.success) {
+      sendError(res, 'Invalid parameters — गलत parameters', 400);
+      return;
+    }
+
+    // Validate body
+    const bodyValidation = adminUpdateVideoSchema.safeParse(req.body);
+    
+    if (!bodyValidation.success) {
+      const errors = bodyValidation.error.errors.map((err) => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }));
+      sendError(res, 'Invalid video data — गलत video डेटा', 400, errors);
+      return;
+    }
+
+    const { courseId, moduleId, videoId } = paramsValidation.data;
+    const updateData = bodyValidation.data;
+
+    // Find course
+    const course = await Course.findById(courseId);
+
+    if (!course) {
+      sendError(res, 'Course not found — कोर्स नहीं मिला', 404);
+      return;
+    }
+
+    // Find module
+    const module = course.modules.id(moduleId);
+
+    if (!module) {
+      sendError(res, 'Module not found — मॉड्यूल नहीं मिला', 404);
+      return;
+    }
+
+    // Find video
+    const video = module.videos.id(videoId);
+
+    if (!video) {
+      sendError(res, 'Video not found — वीडियो नहीं मिला', 404);
+      return;
+    }
+
+    // Update allowed fields
+    if (updateData.title !== undefined) video.title = updateData.title;
+    if (updateData.description !== undefined) video.description = updateData.description;
+    if (updateData.sortOrder !== undefined) video.sortOrder = updateData.sortOrder;
+    if (updateData.isFreePreview !== undefined) video.isFreePreview = updateData.isFreePreview;
+
+    // Save course
+    await course.save();
+
+    sendSuccess(res, course, 'Video updated successfully — वीडियो अपडेट हो गया');
+  }
+);
+
+// ─── adminDeleteVideo ────────────────────────────────────────────────────────
+/**
+ * DELETE /api/admin/courses/:courseId/modules/:moduleId/videos/:videoId
+ * Admin endpoint — deletes a video from a module.
+ */
+
+export const adminDeleteVideo = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Validate params
+    const paramsValidation = adminVideoParamSchema.safeParse(req.params);
+    
+    if (!paramsValidation.success) {
+      sendError(res, 'Invalid parameters — गलत parameters', 400);
+      return;
+    }
+
+    const { courseId, moduleId, videoId } = paramsValidation.data;
+
+    // Find course
+    const course = await Course.findById(courseId);
+
+    if (!course) {
+      sendError(res, 'Course not found — कोर्स नहीं मिला', 404);
+      return;
+    }
+
+    // Find module
+    const module = course.modules.id(moduleId);
+
+    if (!module) {
+      sendError(res, 'Module not found — मॉड्यूल नहीं मिला', 404);
+      return;
+    }
+
+    // Find video
+    const video = module.videos.id(videoId);
+
+    if (!video) {
+      sendError(res, 'Video not found — वीडियो नहीं मिला', 404);
+      return;
+    }
+
+    // Remove video
+    module.videos.pull(videoId);
+
+    // Save course
+    await course.save();
+
+    sendSuccess(res, course, 'Video deleted successfully — वीडियो हटा दिया गया');
+  }
+);
+
+// ─── adminToggleFreePreview ───────────────────────────────────────────────────
+/**
+ * PATCH /api/admin/courses/:courseId/modules/:moduleId/videos/:videoId/preview
+ * Admin endpoint — toggles the free preview flag on a video.
+ */
+
+export const adminToggleFreePreview = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    // Validate params
+    const paramsValidation = adminVideoParamSchema.safeParse(req.params);
+    
+    if (!paramsValidation.success) {
+      sendError(res, 'Invalid parameters — गलत parameters', 400);
+      return;
+    }
+
+    const { courseId, moduleId, videoId } = paramsValidation.data;
+
+    // Find course
+    const course = await Course.findById(courseId);
+
+    if (!course) {
+      sendError(res, 'Course not found — कोर्स नहीं मिला', 404);
+      return;
+    }
+
+    // Find module
+    const module = course.modules.id(moduleId);
+
+    if (!module) {
+      sendError(res, 'Module not found — मॉड्यूल नहीं मिला', 404);
+      return;
+    }
+
+    // Find video
+    const video = module.videos.id(videoId);
+
+    if (!video) {
+      sendError(res, 'Video not found — वीडियो नहीं मिला', 404);
+      return;
+    }
+
+    // Toggle free preview flag
+    video.isFreePreview = !video.isFreePreview;
+
+    // Save course
+    await course.save();
+
+    sendSuccess(res, { video }, 'Free preview toggled successfully — फ्री प्रीव्यू toggle हो गया');
   }
 );

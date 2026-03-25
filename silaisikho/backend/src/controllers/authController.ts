@@ -118,6 +118,7 @@ export const refresh = asyncHandler(async (req: Request, res: Response): Promise
   setRefreshTokenCookie(res, newRefreshToken);
 
   sendSuccess(res, { accessToken, expiresIn }, 'Token refreshed', 200);
+  console.log(token)
 });
 
 // ─── logout ───────────────────────────────────────────────────────────────────

@@ -14,6 +14,7 @@ import userRouter from '@/routes/user';
 import adminRouter from '@/routes/admin';
 import courseRouter from '@/routes/courses';
 import healthRouter from '@/routes/health';
+import webhookRouter from '@/routes/webhooks';
 
 // Import models before any route registration — order reflects reference dependency chain
 import '@/models/User';
@@ -34,11 +35,15 @@ configurePassport();
 // ─── 3. Global rate limiter — must be first middleware ────────────────────────
 app.use(globalRateLimiter);
 
-// ─── 4. Body parsing middleware with size limits ──────────────────────────────
+// ─── 4. Webhook routes — must be mounted BEFORE body parsing middleware ───────
+// Webhooks need raw body for signature verification
+app.use('/api/webhooks', webhookRouter);
+
+// ─── 5. Body parsing middleware with size limits ──────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ─── 5. CORS configuration ────────────────────────────────────────────────────
+// ─── 6. CORS configuration ────────────────────────────────────────────────────
 const corsOptions: CorsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean | string) => void): void => {
     // Parse allowed origins from env
@@ -67,28 +72,28 @@ const corsOptions: CorsOptions = {
 
 app.use(cors(corsOptions));
 
-// ─── 6. Security middleware ───────────────────────────────────────────────────
+// ─── 7. Security middleware ───────────────────────────────────────────────────
 app.use(helmet());
 
-// ─── 7. Request logging ───────────────────────────────────────────────────────
+// ─── 8. Request logging ───────────────────────────────────────────────────────
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// ─── 8. Cookie parsing ────────────────────────────────────────────────────────
+// ─── 9. Cookie parsing ────────────────────────────────────────────────────────
 app.use(cookieParser());
 
-// ─── 9. Passport initialise (no session) ──────────────────────────────────────
+// ─── 10. Passport initialise (no session) ──────────────────────────────────────
 app.use(passport.initialize());
 
-// ─── 10. Health check route — mounted before feature routes ──────────────────
+// ─── 11. Health check route — mounted before feature routes ──────────────────
 app.use('/api/health', healthRouter);
 
-// ─── 11. Feature routes ───────────────────────────────────────────────────────
+// ─── 12. Feature routes ───────────────────────────────────────────────────────
 app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/courses', courseRouter);
 
-// ─── 12. Global error handler — must be last ──────────────────────────────────
+// ─── 13. Global error handler — must be last ──────────────────────────────────
 app.use(errorHandler);
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
